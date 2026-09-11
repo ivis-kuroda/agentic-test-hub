@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@agentic-test-hub/core": "workspace:*",
-    "@agentic-test-hub/plugin": "workspace:*"
+    "@agentic-test-hub/plugin": "workspace:*",
+    "playwright-core": "^1.63.0"
   },
   "devDependencies": {
     "@agentic-test-hub/demo-app": "workspace:*"

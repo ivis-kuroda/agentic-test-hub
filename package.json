@@ -13,9 +13,16 @@
     "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm lint:no-target-coupling && pnpm test",
     "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report"
   },
   "devDependencies": {
+    "@agentic-test-hub/core": "workspace:*",
+    "@agentic-test-hub/demo-app": "workspace:*",
+    "@agentic-test-hub/plugin": "workspace:*",
+    "@agentic-test-hub/runner": "workspace:*",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^5.0.0",

@@ -8,6 +8,9 @@
  * change here.
  */
 export * from "./assert.ts";
+export * from "./evidence.ts";
+export * from "./driver/playwright.ts";
+export * from "./executor/browser.ts";
 export * from "./executor/http.ts";
 export * from "./executor/registry.ts";
 export * from "./executor/shell.ts";
