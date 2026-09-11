@@ -29,18 +29,22 @@ The approach:
 ## Hard constraint: this repository knows nothing about any specific application
 
 The hub is generic. Application-specific knowledge lives in a *plugin*
-repository (for the first target, `weko-test-suite`).
+repository, one per target application, maintained separately from this one.
 
 The hub knows about `shell`, `http`, `sql` and `browser` executors. It does not
 know about any particular product, framework, database schema, or URL.
 
 This is enforced, not merely intended:
 
-- `pnpm lint:no-target-coupling` fails the build if target-specific
-  vocabulary appears in hub source.
+- `pnpm lint:no-target-coupling` fails the build when hub source names a
+  target application. Terms are listed in `scripts/target-vocabulary.txt`, and
+  every new plugin adds its target's name there.
 - `examples/demo-app` is a small application unrelated to any real target. The
   hub's own end-to-end tests run against it. If hub code starts depending on a
   specific target, these tests break.
+
+When the check fires, the fix is to move the knowledge into a plugin or
+rename the thing in generic terms — never to remove the term from the list.
 
 Before adding anything to this repository, ask: *would this still make sense
 for a completely different application?* If not, it belongs in the plugin.
