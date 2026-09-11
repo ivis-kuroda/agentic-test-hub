@@ -2,3 +2,21 @@ packages:
   - packages/*
   - apps/*
   - examples/*
+
+# esbuild and vue-demi run an install-time script (native binary fetch /
+# a compatibility shim respectively). Reviewed and approved so `pnpm
+# install` never stops for an interactive prompt, in CI or otherwise.
+allowBuilds:
+  esbuild: true
+  vue-demi: true
+
+# pnpm 12 refuses a lockfile entry published within the last 24h by
+# default, to give the community time to catch a compromised publish. Our
+# zod dependency is pinned to ^4.6.2 because the core package relies on
+# introspection APIs (z.partialRecord, the internal _zod.def shape used by
+# the store's canonicalise/order logic) that only exist from that version
+# on, and 4.6.2 is also the newest release, so no older version satisfies
+# the range. This is a narrow, auditable exception for one package at one
+# version, not a blanket relaxation of the policy.
+minimumReleaseAgeExclude:
+  - zod@4.6.2
