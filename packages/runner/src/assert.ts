@@ -48,7 +48,10 @@ export function subjectOf(result: ExecutionResult): { value: unknown; from: stri
     return { value: result.rows, from: "the returned rows" };
   }
   if (result.body !== undefined) return { value: result.body, from: "the response body" };
-  return { value: result.stdout ?? "", from: "standard output" };
+  // Trailing whitespace on command output is an artifact of the shell, not
+  // data. Without trimming, a count command printing "0\n" fails to equal 0,
+  // which is a defect in the harness reported as a defect in the target.
+  return { value: (result.stdout ?? "").trim(), from: "standard output" };
 }
 
 /** Text an assertion can search, whatever the operation produced. */
