@@ -8,6 +8,12 @@
 import { loadManifest, type PluginManifest } from "@agentic-test-hub/plugin";
 
 import { ExecutorRegistry } from "../src/executor/registry.ts";
+import type {
+  BrowserDriver,
+  BrowserSession,
+  ConsoleMessage,
+  NetworkExchange,
+} from "../src/executor/browser.ts";
 import type { SpawnFn, SpawnOutcome } from "../src/executor/shell.ts";
 import type { QueryFn, Row } from "../src/executor/sql.ts";
 import type { ExecutionContext } from "../src/executor/types.ts";
@@ -143,3 +149,100 @@ export function registryWith(
   for (const executor of executors) registry.register(executor);
   return registry;
 }
+
+/** A browser session that records what it was asked to do and reports nothing. */
+export class FakeSession implements BrowserSession {
+  readonly actions: string[] = [];
+  readonly console: ConsoleMessage[] = [];
+  readonly network: NetworkExchange[] = [];
+  closed = false;
+  /** Selectors that will never appear, so a wait on them fails. */
+  missing: readonly string[] = [];
+  /** Text returned by {@link textOf}. */
+  text: string | null = "page body";
+
+  goto(url: string): Promise<void> {
+    this.actions.push(`goto ${url}`);
+    return Promise.resolve();
+  }
+  fill(selector: string, value: string): Promise<void> {
+    this.actions.push(`fill ${selector} ${value}`);
+    return Promise.resolve();
+  }
+  click(selector: string): Promise<void> {
+    this.actions.push(`click ${selector}`);
+    return Promise.resolve();
+  }
+  select(selector: string, value: string): Promise<void> {
+    this.actions.push(`select ${selector} ${value}`);
+    return Promise.resolve();
+  }
+  upload(selector: string, file: string): Promise<void> {
+    this.actions.push(`upload ${selector} ${file}`);
+    return Promise.resolve();
+  }
+  waitFor(selector: string): Promise<void> {
+    this.actions.push(`waitFor ${selector}`);
+    if (this.missing.includes(selector)) {
+      return Promise.reject(new Error(`no element matched ${selector}`));
+    }
+    return Promise.resolve();
+  }
+  textOf(): Promise<string | null> {
+    return Promise.resolve(this.text);
+  }
+  screenshot(): Promise<Uint8Array> {
+    return Promise.resolve(new Uint8Array([1, 2, 3]));
+  }
+  consoleMessages(): readonly ConsoleMessage[] {
+    return this.console;
+  }
+  networkExchanges(): readonly NetworkExchange[] {
+    return this.network;
+  }
+  close(): Promise<void> {
+    this.closed = true;
+    return Promise.resolve();
+  }
+}
+
+/** A driver handing out one prepared session, recording how often it opened. */
+export class FakeDriver implements BrowserDriver {
+  opens = 0;
+  readonly session: FakeSession;
+
+  constructor(session: FakeSession = new FakeSession()) {
+    this.session = session;
+  }
+
+  open(): Promise<BrowserSession> {
+    this.opens += 1;
+    return Promise.resolve(this.session);
+  }
+}
+
+/** A manifest with a browser connection and two browser operations. */
+export const browserManifest: PluginManifest = loadManifest(`
+apiVersion: "1"
+name: dispatch-service
+connections:
+  ui:
+    kind: browser
+    baseUrl: "{{env.UI_URL}}"
+operations:
+  OP-OPEN:
+    executor: browser
+    connection: ui
+    steps:
+      - { action: goto, url: "{{env.UI_URL}}/" }
+      - { action: waitFor, selector: "[data-testid=heading]" }
+  OP-COMPOSE:
+    executor: browser
+    connection: ui
+    params: [recipient, channel]
+    steps:
+      - { action: goto, url: "{{env.UI_URL}}/" }
+      - { action: fill, selector: "[data-testid=recipient]", value: "{{param.recipient}}" }
+      - { action: select, selector: "[data-testid=channel]", value: "{{param.channel}}" }
+      - { action: click, selector: "[data-testid=submit]" }
+`).manifest;
