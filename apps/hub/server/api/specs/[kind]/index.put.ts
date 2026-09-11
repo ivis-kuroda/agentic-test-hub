@@ -9,23 +9,25 @@ const Body = z.object({
 });
 
 /**
- * Creates or updates a viewpoint.
+ * Creates or updates one entity of the given kind.
  *
  * A conflict is reported as `409` with the file's current contents, rather
  * than as a generic `500`: the caller needs to show the difference to the
- * person editing, not just tell them something went wrong.
+ * person editing, not just tell them something went wrong. Validation
+ * failure (a malformed entity) is reported as `400` and is never mistaken
+ * for a conflict, since the store checks shape before it checks the hash.
  */
 export default defineEventHandler(async (event) => {
+  const kind = requireEntityKind(getRouterParam(event, "kind"));
   const body = Body.parse(await readBody(event));
   const store = useStore();
 
   try {
-    const result = await store.save({
-      kind: "viewpoint",
+    return await store.save({
+      kind,
       entity: body.entity,
       ...(body.expectedHash === undefined ? {} : { expectedHash: body.expectedHash }),
     });
-    return result;
   } catch (cause) {
     if (cause instanceof ConflictError) {
       throw createError({
