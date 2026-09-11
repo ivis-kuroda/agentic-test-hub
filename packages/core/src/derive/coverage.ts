@@ -1,19 +1,19 @@
-import type { Baseline } from '../schema/baseline.js';
-import type { TestCase } from '../schema/case.js';
-import type { Factor, Level } from '../schema/factor.js';
-import type { Exclusion, Matrix } from '../schema/matrix.js';
-import type { Scenario } from '../schema/scenario.js';
-import type { Viewpoint } from '../schema/viewpoint.js';
-import { derivePlacement } from './placement.js';
+import { derivePlacement } from "./placement.js";
+import type { Baseline } from "../schema/baseline.js";
+import type { TestCase } from "../schema/case.js";
+import type { Factor, Level } from "../schema/factor.js";
+import type { Exclusion, Matrix } from "../schema/matrix.js";
+import type { Scenario } from "../schema/scenario.js";
+import type { Viewpoint } from "../schema/viewpoint.js";
 
 /** What a reviewer sees in one cell of a rendered matrix. */
 export type CellState =
   /** At least one case exercises this combination. */
-  | { readonly kind: 'covered'; readonly cases: readonly string[] }
+  | { readonly kind: "covered"; readonly cases: readonly string[] }
   /** Deliberately not tested, for the stated reason. */
-  | { readonly kind: 'excluded'; readonly reason: string }
+  | { readonly kind: "excluded"; readonly reason: string }
   /** Nothing covers it and no reason was given. This is the finding. */
-  | { readonly kind: 'gap' };
+  | { readonly kind: "gap" };
 
 /** One cell of a rendered matrix. */
 export interface MatrixCell {
@@ -59,7 +59,7 @@ export interface SuiteSlice {
 }
 
 /** Separator for composite map keys. Safe because ids never contain it. */
-const KEY_SEP = '::';
+const KEY_SEP = "::";
 
 function requireFactor(factors: readonly Factor[], id: string): Factor {
   const factor = factors.find((candidate) => candidate.id === id);
@@ -137,17 +137,17 @@ export function buildMatrixView(matrix: Matrix, suite: SuiteSlice): MatrixView {
       const hit = placed.get(`${row.id}${KEY_SEP}${col.id}`);
       if (hit && hit.length > 0) {
         covered += 1;
-        return { row, col, state: { kind: 'covered', cases: hit } as CellState };
+        return { row, col, state: { kind: "covered", cases: hit } as CellState };
       }
       const exclusion = matrix.exclusions.find((candidate) =>
         appliesToCell(candidate, rowFactor.id, colFactor.id, row.id, col.id),
       );
       if (exclusion) {
         excluded += 1;
-        return { row, col, state: { kind: 'excluded', reason: exclusion.reason } as CellState };
+        return { row, col, state: { kind: "excluded", reason: exclusion.reason } as CellState };
       }
       gap += 1;
-      return { row, col, state: { kind: 'gap' } as CellState };
+      return { row, col, state: { kind: "gap" } as CellState };
     }),
   );
 

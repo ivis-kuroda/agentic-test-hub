@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Every entity in the specification model is addressed by a stable,
@@ -9,7 +9,7 @@ import { z } from 'zod';
  * every run result, bug reference and matrix cell that mentions it, so an
  * entity that is removed takes its identifier with it.
  */
-const SEGMENTS = '[A-Z0-9]+(?:-[A-Z0-9]+)*';
+const SEGMENTS = "[A-Z0-9]+(?:-[A-Z0-9]+)*";
 
 /**
  * Builds a schema for identifiers carrying the given prefix.
@@ -21,29 +21,27 @@ const SEGMENTS = '[A-Z0-9]+(?:-[A-Z0-9]+)*';
  */
 export function idSchema(prefix: string, entity: string) {
   const pattern = new RegExp(`^${prefix}-${SEGMENTS}$`);
-  return z
-    .string()
-    .regex(pattern, `${entity} id must look like ${prefix}-EXAMPLE-001`);
+  return z.string().regex(pattern, `${entity} id must look like ${prefix}-EXAMPLE-001`);
 }
 
 /** Identifies a {@link Viewpoint}: what a test is meant to establish. */
-export const ViewpointId = idSchema('VP', 'viewpoint');
+export const ViewpointId = idSchema("VP", "viewpoint");
 /** Identifies a {@link Factor}: one axis of the condition space. */
-export const FactorId = idSchema('F', 'factor');
+export const FactorId = idSchema("F", "factor");
 /** Identifies a {@link Level}: one value a factor can take. */
-export const LevelId = idSchema('L', 'level');
+export const LevelId = idSchema("L", "level");
 /** Identifies a {@link Matrix}: a chosen projection of the condition space. */
-export const MatrixId = idSchema('MX', 'matrix');
+export const MatrixId = idSchema("MX", "matrix");
 /** Identifies a {@link Baseline}: a complete, executable starting point. */
-export const BaselineId = idSchema('BL', 'baseline');
+export const BaselineId = idSchema("BL", "baseline");
 /** Identifies an operation declared by the active plugin. */
-export const OperationId = idSchema('OP', 'operation');
+export const OperationId = idSchema("OP", "operation");
 /** Identifies a {@link TestCase}: one point in the condition space. */
-export const CaseId = idSchema('TC', 'case');
+export const CaseId = idSchema("TC", "case");
 /** Identifies a {@link Scenario}: an ordered, stateful sequence of steps. */
-export const ScenarioId = idSchema('SC', 'scenario');
+export const ScenarioId = idSchema("SC", "scenario");
 /** Identifies a step within a scenario. Unique within its scenario only. */
-export const StepId = idSchema('S', 'step');
+export const StepId = idSchema("S", "step");
 
 /**
  * Names a required state, such as `db.item_type_mapping.pristine`.
@@ -56,5 +54,5 @@ export const StateRef = z
   .string()
   .regex(
     /^[a-z0-9]+(?:[._][a-z0-9]+)*$/,
-    'state ref must be a dotted lower-case name such as db.items.pristine',
+    "state ref must be a dotted lower-case name such as db.items.pristine",
   );

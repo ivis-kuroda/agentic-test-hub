@@ -1,6 +1,7 @@
-import { z } from 'zod';
-import { ViewpointId } from './id.js';
-import { Risk, SourceRef } from './common.js';
+import { z } from "zod";
+
+import { Risk, SourceRef } from "./common.js";
+import { ViewpointId } from "./id.js";
 
 /**
  * Something the suite sets out to establish, stated independently of how it
@@ -25,7 +26,7 @@ export const Viewpoint = z.object({
    * reviewers are entitled to see which one it is.
    */
   source: z.array(SourceRef).min(1),
-  risk: Risk.default('medium'),
+  risk: Risk.default("medium"),
   /**
    * Viewpoints this one specialises, for grouping in the reviewer view.
    * Cycles are rejected at validation time.

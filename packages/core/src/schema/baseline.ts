@@ -1,6 +1,7 @@
-import { z } from 'zod';
-import { BaselineId, OperationId, StateRef } from './id.js';
-import { Target } from './common.js';
+import { z } from "zod";
+
+import { Target } from "./common.js";
+import { BaselineId, OperationId, StateRef } from "./id.js";
 
 /**
  * The action a baseline performs, expressed as a plugin-declared operation.

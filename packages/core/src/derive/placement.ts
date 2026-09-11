@@ -1,8 +1,8 @@
-import type { Baseline } from '../schema/baseline.js';
-import type { TestCase } from '../schema/case.js';
-import type { Factor, Level } from '../schema/factor.js';
-import { applyOverrides, getAtPath } from './path.js';
-import { deepEqual } from './equal.js';
+import { deepEqual } from "./equal.js";
+import { applyOverrides, getAtPath } from "./path.js";
+import type { Baseline } from "../schema/baseline.js";
+import type { TestCase } from "../schema/case.js";
+import type { Factor, Level } from "../schema/factor.js";
 
 /** Which level of each factor a case sits at. */
 export type Placement = Readonly<Record<string, string>>;
@@ -17,11 +17,7 @@ export type Placement = Readonly<Record<string, string>>;
  *   no declared level — which is itself worth reporting, since it means the
  *   factor's levels do not describe the suite.
  */
-export function matchLevel(
-  factor: Factor,
-  present: boolean,
-  value: unknown,
-): Level | undefined {
+export function matchLevel(factor: Factor, present: boolean, value: unknown): Level | undefined {
   if (!present) return factor.levels.find((level) => level.absent);
   return factor.levels.find((level) => !level.absent && deepEqual(level.value, value));
 }

@@ -1,5 +1,6 @@
-import { z } from 'zod';
-import { ViewpointId } from './id.js';
+import { z } from "zod";
+
+import { ViewpointId } from "./id.js";
 
 /**
  * Where a claim in the specification comes from.
@@ -10,7 +11,7 @@ import { ViewpointId } from './id.js';
  */
 export const SourceRef = z.object({
   /** Which kind of artifact the reference points into. */
-  kind: z.enum(['design', 'code', 'issue', 'standard', 'other']),
+  kind: z.enum(["design", "code", "issue", "standard", "other"]),
   /**
    * Locator within that artifact. Free-form because the shape differs per
    * kind: a document section, a `path/to/file.py:symbol`, an issue key.
@@ -26,7 +27,7 @@ export type SourceRef = z.infer<typeof SourceRef>;
  * How much is at stake if the behaviour under test is wrong. Used to order
  * the reviewer view, so that attention lands on the riskiest areas first.
  */
-export const Risk = z.enum(['high', 'medium', 'low']);
+export const Risk = z.enum(["high", "medium", "low"]);
 /** How much is at stake if the behaviour under test is wrong. */
 export type Risk = z.infer<typeof Risk>;
 

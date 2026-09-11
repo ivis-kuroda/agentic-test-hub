@@ -1,5 +1,5 @@
-import type { EvidenceSource, Polarity } from '../schema/evidence.js';
-import type { SourceCondition, VerdictPolicy } from '../schema/policy.js';
+import type { EvidenceSource, Polarity } from "../schema/evidence.js";
+import type { SourceCondition, VerdictPolicy } from "../schema/policy.js";
 
 /**
  * What one evidence channel actually showed.
@@ -34,11 +34,11 @@ export interface Observation {
 /** The outcome of judging a run against a policy. */
 export type Verdict =
   /** Every binding condition was met. */
-  | 'pass'
+  | "pass"
   /** At least one binding condition was contradicted. */
-  | 'fail'
+  | "fail"
   /** Not enough evidence to decide. Never reported as a pass. */
-  | 'inconclusive';
+  | "inconclusive";
 
 /** Why a single source did not meet its condition. */
 export interface ConditionFailure {
@@ -58,40 +58,37 @@ export interface VerdictResult {
   readonly decidedBy: readonly EvidenceSource[];
 }
 
-function checkCondition(
-  condition: SourceCondition,
-  observation: Observation,
-): string | undefined {
+function checkCondition(condition: SourceCondition, observation: Observation): string | undefined {
   const errors = observation.errors ?? [];
   switch (condition) {
-    case 'informational':
+    case "informational":
       return undefined;
-    case 'clean':
+    case "clean":
       return errors.length === 0 ? undefined : `${errors.length} error(s) reported`;
-    case 'expected_error':
-      if (errors.length === 0) return 'no error was reported, but one was expected';
+    case "expected_error":
+      if (errors.length === 0) return "no error was reported, but one was expected";
       return observation.matchedExpectation === true
         ? undefined
-        : 'an error was reported but it is not the expected one';
-    case 'matches_expectation':
+        : "an error was reported but it is not the expected one";
+    case "matches_expectation":
       return observation.matchedExpectation === true
         ? undefined
-        : 'does not match the stated expectation';
-    case 'success_response': {
+        : "does not match the stated expectation";
+    case "success_response": {
       const status = observation.status;
-      if (status === undefined) return 'no response status was observed';
+      if (status === undefined) return "no response status was observed";
       return status >= 200 && status < 300 ? undefined : `status ${status} is not a success`;
     }
-    case 'error_response': {
+    case "error_response": {
       const status = observation.status;
-      if (status === undefined) return 'no response status was observed';
+      if (status === undefined) return "no response status was observed";
       return status >= 400 ? undefined : `status ${status} is not a rejection`;
     }
-    case 'expected_change':
+    case "expected_change":
       return (observation.intendedChanges ?? 0) > 0
         ? undefined
-        : 'the intended data change was not observed';
-    case 'no_residual_change':
+        : "the intended data change was not observed";
+    case "no_residual_change":
       return (observation.residualChanges ?? 0) === 0
         ? undefined
         : `${observation.residualChanges} unintended change(s) remain`;
@@ -134,7 +131,7 @@ export function evaluateVerdict(
   for (const [rawSource, rawCondition] of Object.entries(rules)) {
     const source = rawSource as EvidenceSource;
     const condition = rawCondition as SourceCondition;
-    if (condition === 'informational') continue;
+    if (condition === "informational") continue;
 
     const observation = seen.get(source);
     if (!observation || !observation.collected) {
@@ -148,18 +145,17 @@ export function evaluateVerdict(
   }
 
   if (failures.length > 0) {
-    return { verdict: 'fail', failures, missing, decidedBy };
+    return { verdict: "fail", failures, missing, decidedBy };
   }
   if (missing.length > 0) {
-    return { verdict: 'inconclusive', failures, missing, decidedBy };
+    return { verdict: "inconclusive", failures, missing, decidedBy };
   }
 
   const weakOnly =
-    decidedBy.length > 0 &&
-    decidedBy.every((source) => policy.insufficientAlone.includes(source));
+    decidedBy.length > 0 && decidedBy.every((source) => policy.insufficientAlone.includes(source));
   if (decidedBy.length === 0 || weakOnly) {
-    return { verdict: 'inconclusive', failures, missing, decidedBy };
+    return { verdict: "inconclusive", failures, missing, decidedBy };
   }
 
-  return { verdict: 'pass', failures, missing, decidedBy };
+  return { verdict: "pass", failures, missing, decidedBy };
 }

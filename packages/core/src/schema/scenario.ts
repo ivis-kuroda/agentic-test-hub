@@ -1,9 +1,10 @@
-import { z } from 'zod';
-import { ScenarioId, StateRef, StepId } from './id.js';
-import { AppliesTo, Target, Traceable } from './common.js';
-import { Expectation } from './expectation.js';
-import { ActionRef } from './baseline.js';
-import { EvidencePlan, Polarity } from './evidence.js';
+import { z } from "zod";
+
+import { ActionRef } from "./baseline.js";
+import { AppliesTo, Target, Traceable } from "./common.js";
+import { EvidencePlan, Polarity } from "./evidence.js";
+import { Expectation } from "./expectation.js";
+import { ScenarioId, StateRef, StepId } from "./id.js";
 
 /**
  * One judged action within a scenario.
@@ -24,7 +25,7 @@ export const Step = Traceable.extend({
   /** What must hold after the action. */
   expect: z.array(Expectation).min(1),
   /** Whether this step expects success or expects to be rejected. */
-  polarity: Polarity.default('nominal'),
+  polarity: Polarity.default("nominal"),
   /**
    * Steps that must have run first.
    *

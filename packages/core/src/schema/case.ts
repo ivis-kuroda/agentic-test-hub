@@ -1,8 +1,9 @@
-import { z } from 'zod';
-import { BaselineId, CaseId, FactorId, LevelId } from './id.js';
-import { AppliesTo, Target, Traceable } from './common.js';
-import { Expectation } from './expectation.js';
-import { EvidencePlan, Polarity } from './evidence.js';
+import { z } from "zod";
+
+import { AppliesTo, Target, Traceable } from "./common.js";
+import { EvidencePlan, Polarity } from "./evidence.js";
+import { Expectation } from "./expectation.js";
+import { BaselineId, CaseId, FactorId, LevelId } from "./id.js";
 
 /**
  * A single difference between a case and its baseline.
@@ -15,7 +16,7 @@ import { EvidencePlan, Polarity } from './evidence.js';
 export const Override = z.object({
   path: z.string().min(1),
   /** `set` writes a value, `remove` deletes the key, `append` extends a list. */
-  op: z.enum(['set', 'remove', 'append']).default('set'),
+  op: z.enum(["set", "remove", "append"]).default("set"),
   /** Required for `set` and `append`; rejected for `remove`. */
   value: z.unknown().optional(),
 });
@@ -25,11 +26,11 @@ export type Override = z.infer<typeof Override>;
 /** How far a case has progressed towards being executed by machine. */
 export const AutomationStatus = z.enum([
   /** Executed by a person; no code exists. */
-  'manual',
+  "manual",
   /** Code has been generated but not yet confirmed against the application. */
-  'generated',
+  "generated",
   /** Code exists and has been seen to pass and to fail for the right reason. */
-  'verified',
+  "verified",
 ]);
 
 /**
@@ -65,7 +66,7 @@ export const TestCase = Traceable.extend({
    * success case and undermines a rejection case, where silence means the
    * system failed to reject what it should have.
    */
-  polarity: Polarity.default('nominal'),
+  polarity: Polarity.default("nominal"),
   /** Overrides the suite's default evidence collection for this case. */
   evidence: EvidencePlan.optional(),
   /**
@@ -82,17 +83,17 @@ export const TestCase = Traceable.extend({
    * touching `config` or preconditions demands exclusive execution. Set it
    * explicitly only to correct that inference.
    */
-  isolation: z.enum(['shared', 'exclusive']).optional(),
-  priority: z.enum(['P1', 'P2', 'P3']).default('P2'),
+  isolation: z.enum(["shared", "exclusive"]).optional(),
+  priority: z.enum(["P1", "P2", "P3"]).default("P2"),
   tags: z.array(z.string().min(1)).default([]),
   appliesTo: AppliesTo.optional(),
   automation: z
     .object({
-      status: AutomationStatus.default('manual'),
+      status: AutomationStatus.default("manual"),
       /** Path to the generated test, relative to the plugin repository. */
       impl: z.string().min(1).optional(),
     })
-    .default({ status: 'manual' }),
+    .default({ status: "manual" }),
 });
 /** One point in the condition space. */
 export type TestCase = z.infer<typeof TestCase>;

@@ -11,7 +11,7 @@
  */
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
     return false;
   }
   if (Array.isArray(a) !== Array.isArray(b)) return false;
@@ -22,7 +22,5 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   const right = b as Record<string, unknown>;
   const leftKeys = Object.keys(left);
   if (leftKeys.length !== Object.keys(right).length) return false;
-  return leftKeys.every(
-    (key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]),
-  );
+  return leftKeys.every((key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]));
 }

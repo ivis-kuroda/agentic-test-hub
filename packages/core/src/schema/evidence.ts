@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * A channel through which a test's behaviour can be observed.
@@ -14,17 +14,17 @@ import { z } from 'zod';
  */
 export const EvidenceSource = z.enum([
   /** Rendered appearance of the surface under test. */
-  'screenshot',
+  "screenshot",
   /** Client-side errors and warnings reported by the browser. */
-  'browser_console',
+  "browser_console",
   /** Requests the client made, with status codes and bodies. */
-  'browser_network',
+  "browser_network",
   /** Database rows before and after the action, compared. */
-  'db_records',
+  "db_records",
   /** Application or service logs produced during the action. */
-  'app_log',
+  "app_log",
   /** Database server logs: errors, constraint violations, slow queries. */
-  'db_log',
+  "db_log",
 ]);
 /** A channel through which a test's behaviour can be observed. */
 export type EvidenceSource = z.infer<typeof EvidenceSource>;
@@ -32,13 +32,13 @@ export type EvidenceSource = z.infer<typeof EvidenceSource>;
 /** When evidence is captured relative to the action under test. */
 export const CaptureTiming = z.enum([
   /** Once before the action, to establish a baseline for comparison. */
-  'before',
+  "before",
   /** Once after the action. */
-  'after',
+  "after",
   /** Around every step, for scenarios where intermediate state matters. */
-  'each_step',
+  "each_step",
   /** Only when something failed, to keep passing runs cheap. */
-  'on_failure',
+  "on_failure",
 ]);
 /** When evidence is captured relative to the action under test. */
 export type CaptureTiming = z.infer<typeof CaptureTiming>;
@@ -52,7 +52,7 @@ export type CaptureTiming = z.infer<typeof CaptureTiming>;
  * system did not reject what it should have. Without this field a runner
  * cannot tell which rule to apply.
  */
-export const Polarity = z.enum(['nominal', 'error']);
+export const Polarity = z.enum(["nominal", "error"]);
 /** Whether a test expects the system to succeed or to reject the input. */
 export type Polarity = z.infer<typeof Polarity>;
 
@@ -61,12 +61,12 @@ export const EvidencePlan = z.object({
   /** Sources to collect. Defaults to every source. */
   sources: z.array(EvidenceSource).default([...EvidenceSource.options]),
   /** When to capture. */
-  timing: CaptureTiming.default('after'),
+  timing: CaptureTiming.default("after"),
   /**
    * Also capture a full execution trace. Traces are large, so the default
    * keeps them for failures, where they are worth their size.
    */
-  trace: z.enum(['always', 'on_failure', 'never']).default('on_failure'),
+  trace: z.enum(["always", "on_failure", "never"]).default("on_failure"),
 });
 /** What evidence to collect for a case or scenario, and when. */
 export type EvidencePlan = z.infer<typeof EvidencePlan>;

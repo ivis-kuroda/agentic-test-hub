@@ -1,5 +1,6 @@
-import { z } from 'zod';
-import { FactorId, LevelId } from './id.js';
+import { z } from "zod";
+
+import { FactorId, LevelId } from "./id.js";
 
 /**
  * One value a {@link Factor} can take.

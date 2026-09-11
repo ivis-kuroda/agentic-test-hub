@@ -1,6 +1,7 @@
-import { z } from 'zod';
-import { FactorId, LevelId, MatrixId } from './id.js';
-import { Traceable } from './common.js';
+import { z } from "zod";
+
+import { Traceable } from "./common.js";
+import { FactorId, LevelId, MatrixId } from "./id.js";
 
 /**
  * How much of the condition space a matrix intends to cover.
@@ -13,11 +14,11 @@ import { Traceable } from './common.js';
  */
 export const CoverageStrategy = z.enum([
   /** Change one factor from the baseline at a time. */
-  'single_factor',
+  "single_factor",
   /** Cover every pair of levels across factors at least once. */
-  'pairwise',
+  "pairwise",
   /** Every combination. Only viable for very few factors. */
-  'full',
+  "full",
 ]);
 /** How much of the condition space a matrix intends to cover. */
 export type CoverageStrategy = z.infer<typeof CoverageStrategy>;
@@ -57,7 +58,7 @@ export const Matrix = Traceable.extend({
    * view offers them as alternative axes.
    */
   additional: z.array(FactorId).default([]),
-  strategy: CoverageStrategy.default('single_factor'),
+  strategy: CoverageStrategy.default("single_factor"),
   exclusions: z.array(Exclusion).default([]),
 });
 /** A two-dimensional projection of the condition space, for review. */

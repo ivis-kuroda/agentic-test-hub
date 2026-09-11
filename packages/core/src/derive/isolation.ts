@@ -1,13 +1,13 @@
-import type { Override, TestCase } from '../schema/case.js';
+import type { Override, TestCase } from "../schema/case.js";
 
 /** Whether a case may share the environment prepared for its baseline. */
-export type Isolation = 'shared' | 'exclusive';
+export type Isolation = "shared" | "exclusive";
 
 /**
  * Path prefixes whose modification changes state outside the request, and so
  * cannot be shared with concurrently running cases.
  */
-const EXCLUSIVE_PREFIXES = ['config', 'preconditions', 'target'] as const;
+const EXCLUSIVE_PREFIXES = ["config", "preconditions", "target"] as const;
 
 /**
  * Decides whether a case needs an environment of its own.
@@ -27,7 +27,7 @@ const EXCLUSIVE_PREFIXES = ['config', 'preconditions', 'target'] as const;
  */
 export function deriveIsolation(testCase: TestCase): Isolation {
   if (testCase.isolation !== undefined) return testCase.isolation;
-  return requiresExclusive(testCase.overrides) ? 'exclusive' : 'shared';
+  return requiresExclusive(testCase.overrides) ? "exclusive" : "shared";
 }
 
 function requiresExclusive(overrides: readonly Override[]): boolean {
@@ -50,14 +50,15 @@ export function groupForExecution(
   cases: readonly TestCase[],
 ): { key: string; baseline: string; isolation: Isolation; cases: TestCase[] }[] {
   const shared = new Map<string, TestCase[]>();
-  const exclusive: { key: string; baseline: string; isolation: Isolation; cases: TestCase[] }[] = [];
+  const exclusive: { key: string; baseline: string; isolation: Isolation; cases: TestCase[] }[] =
+    [];
 
   for (const testCase of cases) {
-    if (deriveIsolation(testCase) === 'exclusive') {
+    if (deriveIsolation(testCase) === "exclusive") {
       exclusive.push({
         key: `${testCase.baseline}#${testCase.id}`,
         baseline: testCase.baseline,
-        isolation: 'exclusive',
+        isolation: "exclusive",
         cases: [testCase],
       });
       continue;
@@ -71,7 +72,7 @@ export function groupForExecution(
     ...[...shared].map(([baseline, grouped]) => ({
       key: baseline,
       baseline,
-      isolation: 'shared' as const,
+      isolation: "shared" as const,
       cases: grouped,
     })),
     ...exclusive,

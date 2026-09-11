@@ -1,5 +1,5 @@
-import type { Baseline } from '../schema/baseline.js';
-import type { Override } from '../schema/case.js';
+import type { Baseline } from "../schema/baseline.js";
+import type { Override } from "../schema/case.js";
 
 /**
  * A value read from a resolved baseline, distinguishing "absent" from
@@ -17,7 +17,7 @@ export type Resolved =
 export const ABSENT: Resolved = { present: false };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -30,7 +30,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function getAtPath(root: unknown, path: string): Resolved {
   let current: unknown = root;
-  for (const segment of path.split('.')) {
+  for (const segment of path.split(".")) {
     if (!isRecord(current) || !(segment in current)) return ABSENT;
     current = current[segment];
   }
@@ -45,12 +45,8 @@ export function getAtPath(root: unknown, path: string): Resolved {
  * @param path - Dotted path to write.
  * @param value - Value to store.
  */
-export function setAtPath(
-  root: Record<string, unknown>,
-  path: string,
-  value: unknown,
-): void {
-  const segments = path.split('.');
+export function setAtPath(root: Record<string, unknown>, path: string, value: unknown): void {
+  const segments = path.split(".");
   const last = segments.pop();
   if (last === undefined) return;
   let current: Record<string, unknown> = root;
@@ -64,7 +60,7 @@ export function setAtPath(
 
 /** Removes a dotted path from a nested structure. Mutates `root`. */
 export function removeAtPath(root: Record<string, unknown>, path: string): void {
-  const segments = path.split('.');
+  const segments = path.split(".");
   const last = segments.pop();
   if (last === undefined) return;
   let current: unknown = root;
@@ -77,11 +73,11 @@ export function removeAtPath(root: Record<string, unknown>, path: string): void 
 
 /** A baseline with a case's overrides applied. */
 export interface ResolvedBaseline {
-  readonly target: Baseline['target'];
+  readonly target: Baseline["target"];
   readonly preconditions: readonly string[];
   readonly config: Record<string, unknown>;
   readonly context: Record<string, unknown>;
-  readonly action: Baseline['action'];
+  readonly action: Baseline["action"];
 }
 
 /**
@@ -108,11 +104,11 @@ export function applyOverrides(
   }) as Record<string, unknown>;
 
   for (const override of overrides) {
-    if (override.op === 'remove') {
+    if (override.op === "remove") {
       removeAtPath(draft, override.path);
       continue;
     }
-    if (override.op === 'append') {
+    if (override.op === "append") {
       const existing = getAtPath(draft, override.path);
       const list = existing.present && Array.isArray(existing.value) ? existing.value : [];
       setAtPath(draft, override.path, [...list, override.value]);
@@ -124,8 +120,8 @@ export function applyOverrides(
   return {
     target: baseline.target,
     preconditions: baseline.preconditions,
-    config: draft['config'] as Record<string, unknown>,
-    context: draft['context'] as Record<string, unknown>,
-    action: draft['action'] as Baseline['action'],
+    config: draft["config"] as Record<string, unknown>,
+    context: draft["context"] as Record<string, unknown>,
+    action: draft["action"] as Baseline["action"],
   };
 }

@@ -1,5 +1,6 @@
-import { z } from 'zod';
-import { EvidenceSource, Polarity } from './evidence.js';
+import { z } from "zod";
+
+import { EvidenceSource, Polarity } from "./evidence.js";
 
 /**
  * What a single evidence source must show for a test to pass.
@@ -10,21 +11,21 @@ import { EvidenceSource, Polarity } from './evidence.js';
  */
 export const SourceCondition = z.enum([
   /** No errors, exceptions or violations of any kind. */
-  'clean',
+  "clean",
   /** An error matching what the case expects is present. */
-  'expected_error',
+  "expected_error",
   /** Matches the case's stated expectations. */
-  'matches_expectation',
+  "matches_expectation",
   /** A successful response: any 2xx status. */
-  'success_response',
+  "success_response",
   /** A rejection the case expects: a 4xx or 5xx status. */
-  'error_response',
+  "error_response",
   /** The intended rows were written, updated or removed. */
-  'expected_change',
+  "expected_change",
   /** Nothing was left behind: the action rolled back cleanly. */
-  'no_residual_change',
+  "no_residual_change",
   /** Collected for the record, but not used to decide the verdict. */
-  'informational',
+  "informational",
 ]);
 /** What a single evidence source must show for a test to pass. */
 export type SourceCondition = z.infer<typeof SourceCondition>;
@@ -50,7 +51,7 @@ export const VerdictPolicy = z.object({
    * as a pass, which is the difference between a suite that catches broken
    * backends and one that photographs them looking fine.
    */
-  insufficientAlone: z.array(EvidenceSource).default(['screenshot']),
+  insufficientAlone: z.array(EvidenceSource).default(["screenshot"]),
 });
 /** The rules by which collected evidence becomes a verdict. */
 export type VerdictPolicy = z.infer<typeof VerdictPolicy>;
@@ -66,25 +67,25 @@ export type VerdictPolicy = z.infer<typeof VerdictPolicy>;
  * that was expected, in the place it was expected.
  */
 export const DEFAULT_VERDICT_POLICY: VerdictPolicy = VerdictPolicy.parse({
-  id: 'default',
-  title: 'Cross-checked evidence across client, service and data',
+  id: "default",
+  title: "Cross-checked evidence across client, service and data",
   rules: {
     nominal: {
-      screenshot: 'matches_expectation',
-      browser_console: 'clean',
-      browser_network: 'success_response',
-      db_records: 'expected_change',
-      app_log: 'clean',
-      db_log: 'clean',
+      screenshot: "matches_expectation",
+      browser_console: "clean",
+      browser_network: "success_response",
+      db_records: "expected_change",
+      app_log: "clean",
+      db_log: "clean",
     },
     error: {
-      screenshot: 'expected_error',
-      browser_console: 'informational',
-      browser_network: 'error_response',
-      db_records: 'no_residual_change',
-      app_log: 'expected_error',
-      db_log: 'informational',
+      screenshot: "expected_error",
+      browser_console: "informational",
+      browser_network: "error_response",
+      db_records: "no_residual_change",
+      app_log: "expected_error",
+      db_log: "informational",
     },
   },
-  insufficientAlone: ['screenshot'],
+  insufficientAlone: ["screenshot"],
 });
