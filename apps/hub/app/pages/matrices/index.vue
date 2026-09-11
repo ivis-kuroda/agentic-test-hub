@@ -26,10 +26,18 @@ function cellClass(kind: "covered" | "excluded" | "gap"): string {
 
 <template>
   <div class="max-w-4xl">
-    <h1 class="text-xl font-semibold mb-6">Coverage matrices</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-xl font-semibold">Coverage matrices</h1>
+      <UButton to="/matrices/new" label="New matrix" />
+    </div>
 
     <div v-for="view in views" :key="view.matrix.id" class="mb-10">
-      <h2 class="font-medium mb-2">{{ view.matrix.title }}</h2>
+      <div class="flex items-center gap-2 mb-2">
+        <h2 class="font-medium">{{ view.matrix.title }}</h2>
+        <NuxtLink :to="`/matrices/${view.matrix.id}`" class="text-sm text-muted hover:underline">
+          edit
+        </NuxtLink>
+      </div>
       <table class="border-collapse text-sm">
         <thead>
           <tr>
