@@ -18,11 +18,13 @@
     "e2e:report": "playwright show-report",
     "specs:check": "node scripts/check-spec-round-trip.ts examples/demo-app/specs",
     "specs:normalise": "node scripts/normalise-specs.ts examples/demo-app/specs",
-    "specs:validate": "node scripts/validate-specs.ts examples/demo-app/specs"
+    "specs:validate": "node scripts/validate-specs.ts examples/demo-app/specs",
+    "specs:review": "node scripts/render-reviewer-view.ts examples/demo-app/specs /tmp/reviewer-view.html \"Demo dispatch service — test specification review\""
   },
   "devDependencies": {
     "@agentic-test-hub/core": "workspace:*",
     "@agentic-test-hub/demo-app": "workspace:*",
+    "@agentic-test-hub/export": "workspace:*",
     "@agentic-test-hub/plugin": "workspace:*",
     "@agentic-test-hub/runner": "workspace:*",
     "@agentic-test-hub/store": "workspace:*",
