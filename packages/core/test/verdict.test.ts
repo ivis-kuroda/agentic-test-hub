@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateVerdict, type Observation } from "../src/derive/verdict.js";
+import { evaluateVerdict, validateWaivers, type Observation } from "../src/derive/verdict.js";
 import { DEFAULT_VERDICT_POLICY, VerdictPolicy } from "../src/schema/policy.js";
 
 const clean = (source: Observation["source"], extra: Partial<Observation> = {}): Observation => ({
@@ -187,5 +187,65 @@ describe("evaluateVerdict, insufficient evidence", () => {
       "app_log",
       "db_log",
     ]);
+  });
+});
+
+describe("evidence waivers", () => {
+  it("judges a case without a channel it was excused from", () => {
+    const withoutDbLog = nominalPass.filter((observation) => observation.source !== "db_log");
+    const result = evaluateVerdict(DEFAULT_VERDICT_POLICY, "nominal", withoutDbLog, [
+      { source: "db_log", reason: "this deployment does not expose the database log" },
+    ]);
+    expect(result.verdict).toBe("pass");
+    expect(result.waived.map((waiver) => waiver.source)).toEqual(["db_log"]);
+  });
+
+  it("refuses to excuse a case from client-side errors", () => {
+    const result = evaluateVerdict(DEFAULT_VERDICT_POLICY, "nominal", nominalPass, [
+      { source: "browser_console", reason: "the console is noisy" },
+    ]);
+    expect(result.verdict).toBe("fail");
+    expect(result.failures[0]?.why).toMatch(/cannot be waived/);
+  });
+
+  it("refuses to excuse a case from server-side errors", () => {
+    const result = evaluateVerdict(DEFAULT_VERDICT_POLICY, "nominal", nominalPass, [
+      { source: "app_log", reason: "the log is hard to read" },
+    ]);
+    expect(result.verdict).toBe("fail");
+  });
+
+  it("refuses to excuse a case from data integrity", () => {
+    const result = evaluateVerdict(DEFAULT_VERDICT_POLICY, "nominal", nominalPass, [
+      { source: "db_records", reason: "checking rows is slow" },
+    ]);
+    expect(result.verdict).toBe("fail");
+  });
+
+  it("still refuses to pass on a screenshot once everything waivable is waived", () => {
+    const result = evaluateVerdict(
+      DEFAULT_VERDICT_POLICY,
+      "nominal",
+      [clean("screenshot", { matchedExpectation: true })],
+      [
+        { source: "browser_network", reason: "no network activity in this case" },
+        { source: "db_log", reason: "unavailable" },
+      ],
+    );
+    expect(result.verdict).not.toBe("pass");
+  });
+
+  it("reports impermissible waivers before a run, not during one", () => {
+    const problems = validateWaivers(DEFAULT_VERDICT_POLICY, [
+      { source: "db_log", reason: "unavailable" },
+      { source: "app_log", reason: "noisy" },
+    ]);
+    expect(problems.map((problem) => problem.source)).toEqual(["app_log"]);
+  });
+
+  it("accepts a set of waivers the policy permits", () => {
+    expect(
+      validateWaivers(DEFAULT_VERDICT_POLICY, [{ source: "db_log", reason: "unavailable" }]),
+    ).toEqual([]);
   });
 });
