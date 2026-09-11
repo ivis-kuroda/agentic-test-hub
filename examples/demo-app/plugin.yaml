@@ -1,0 +1,110 @@
+# Plugin manifest for the demo service.
+#
+# This file is the hub's proof that it needs no built-in knowledge of any
+# application. Everything the hub does to the demo service is declared here,
+# in configuration, using only the four ways it knows how to act.
+#
+# The hub's own end-to-end tests run against this manifest. If hub code ever
+# starts depending on a particular target, these tests break.
+apiVersion: "1"
+name: demo-service
+description: fictional notification dispatch service, used to test the hub itself
+
+connections:
+  api:
+    kind: http
+    baseUrl: "{{env.DEMO_URL}}"
+    headers:
+      Accept: application/json
+
+  ui:
+    kind: browser
+    baseUrl: "{{env.DEMO_URL}}"
+
+operations:
+  OP-SEND:
+    executor: http
+    connection: api
+    method: POST
+    path: /notifications
+    params: [recipient, channel]
+    headers:
+      Authorization: "Bearer {{env.DEMO_TOKEN}}"
+    body:
+      recipient: "{{param.recipient}}"
+      channel: "{{param.channel}}"
+
+  OP-SEND-UNAUTHENTICATED:
+    executor: http
+    connection: api
+    method: POST
+    path: /notifications
+    params: [recipient, channel]
+    body:
+      recipient: "{{param.recipient}}"
+      channel: "{{param.channel}}"
+
+  OP-LIST:
+    executor: http
+    connection: api
+    path: /notifications
+
+  OP-HEALTH:
+    executor: http
+    connection: api
+    path: /health
+
+  OP-READ-LOGS:
+    executor: http
+    connection: api
+    path: /logs
+
+  OP-COUNT:
+    executor: shell
+    run: ["node", "examples/demo-app/cli.ts", "count", "--url", "{{env.DEMO_URL}}"]
+    timeoutMs: 15000
+
+  OP-DRAIN:
+    executor: shell
+    run: ["node", "examples/demo-app/cli.ts", "drain", "--url", "{{env.DEMO_URL}}"]
+    timeoutMs: 15000
+
+  OP-OPEN-DASHBOARD:
+    executor: browser
+    connection: ui
+    steps:
+      - { action: goto, url: "{{env.DEMO_URL}}/" }
+      - { action: waitFor, selector: "[data-testid=heading]" }
+
+  OP-COMPOSE:
+    executor: browser
+    connection: ui
+    params: [recipient, channel]
+    steps:
+      - { action: goto, url: "{{env.DEMO_URL}}/" }
+      - { action: fill, selector: "[data-testid=recipient]", value: "{{param.recipient}}" }
+      - { action: select, selector: "[data-testid=channel]", value: "{{param.channel}}" }
+      - { action: click, selector: "[data-testid=submit]" }
+
+states:
+  queue.empty:
+    description: no notifications are held by the service
+    ensure:
+      operation: OP-DRAIN
+    verify:
+      operation: OP-COUNT
+      assert: { kind: equals, value: 0 }
+    cost: low
+
+  service.reachable:
+    description: the service answers its health check
+    ensure:
+      operation: OP-HEALTH
+    verify:
+      operation: OP-HEALTH
+      assert: { kind: contains, value: '"ok":true' }
+    cost: low
+
+evidence:
+  app_log:
+    operation: OP-READ-LOGS
