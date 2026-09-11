@@ -6,5 +6,8 @@
  * returns a string. Nothing reads a file or writes one; that is left to
  * whatever calls this from a CLI, a web handler, or a test.
  */
+export * from "./collapse.ts";
+export * from "./delivery-excel.ts";
 export * from "./escape.ts";
+export * from "./execution-rows.ts";
 export * from "./reviewer-view.ts";
