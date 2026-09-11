@@ -48,8 +48,19 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
 
-      - name: Report the runtime actually in use
-        run: node --version
+      # Asserted rather than printed for a human to notice. Direct execution
+      # of TypeScript is what removes the build step, so a runner silently
+      # falling back to an older major would quietly change what is tested.
+      - name: Require the pinned runtime
+        run: |
+          node --version
+          node --eval "
+            const major = Number(process.versions.node.split('.')[0]);
+            if (major < 26) {
+              console.error(\`expected node >= 26, got \${process.versions.node}\`);
+              process.exit(1);
+            }
+          "
 
       - run: pnpm install --frozen-lockfile
 
