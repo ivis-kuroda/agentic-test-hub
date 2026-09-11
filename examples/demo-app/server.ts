@@ -74,16 +74,39 @@ function html(response: ServerResponse, status: number, body: string): void {
   response.end(body);
 }
 
+/**
+ * Reads a request body, accepting both of the shapes a real service receives.
+ *
+ * A browser submitting a form sends form encoding; a client calling the API
+ * sends JSON. Supporting only the latter would make the page unusable, and a
+ * demo whose own form does not work is not much of a demo.
+ */
 async function readRequestBody(request: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(chunk as Buffer);
   const text = Buffer.concat(chunks).toString("utf8");
   if (text === "") return undefined;
+
+  const contentType = request.headers["content-type"] ?? "";
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    return Object.fromEntries(new URLSearchParams(text));
+  }
   try {
     return JSON.parse(text);
   } catch {
     return text;
   }
+}
+
+/** Reads one cookie from a request. */
+function cookie(request: IncomingMessage, name: string): string | undefined {
+  const header = request.headers.cookie;
+  if (header === undefined) return undefined;
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) return rest.join("=");
+  }
+  return undefined;
 }
 
 /**
@@ -93,7 +116,7 @@ async function readRequestBody(request: IncomingMessage): Promise<unknown> {
  * example shows what a target looks like when it has been made testable, so
  * the hub's own browser tests never depend on incidental markup.
  */
-function page(state: DemoState): string {
+function page(state: DemoState, variant: "sound" | "broken" | "noisy" = "sound"): string {
   const rows = state.notifications
     .map(
       (notification) =>
@@ -115,9 +138,38 @@ function page(state: DemoState): string {
   </form>
   <p data-testid="count">${state.notifications.length}</p>
   <ul data-testid="notifications">${rows}</ul>
+  ${variant === "broken" ? BROKEN_SCRIPT : variant === "noisy" ? NOISY_SCRIPT : ""}
 </body>
 </html>`;
 }
+
+/**
+ * A page that is merely noisy.
+ *
+ * It asks for something that is not there, which a browser reports on the
+ * console as an error, and does nothing else wrong. Mature applications are
+ * full of this — an absent optional asset, a third-party script that gives up
+ * — and a suite that treats it as failure is a suite whose console channel
+ * gets switched off. Having a page that reproduces it means the filtering can
+ * be tested rather than asserted.
+ */
+const NOISY_SCRIPT = `<script>
+  fetch("/legacy/optional-widget.json").catch(function () {});
+</script>`;
+
+/**
+ * A page that looks correct and is not.
+ *
+ * Served on request so the hub's own tests can demonstrate the thing the
+ * evidence rules exist for: every visible element is present and correct, so
+ * a screenshot shows a working page, while the console carries an uncaught
+ * exception and a request to the service failed. A suite that judged by
+ * appearance would pass this.
+ */
+const BROKEN_SCRIPT = `<script>
+  fetch("/does-not-exist").catch(function () {});
+  window.setTimeout(function () { throw new Error("dispatch widget failed to initialise"); }, 0);
+</script>`;
 
 /**
  * Starts the service.
@@ -149,8 +201,29 @@ export async function startDemoApp(options: DemoOptions = {}): Promise<RunningDe
       return;
     }
 
+    if (route === "GET /favicon.ico") {
+      // Answered rather than left to 404. A browser reports a failed
+      // subresource load as a console error, so a missing favicon makes every
+      // page look broken on the console channel. Real applications have the
+      // same problem; this one does not model it.
+      response.writeHead(204).end();
+      return;
+    }
+
     if (route === "GET /") {
-      html(response, 200, page(state));
+      // Opening the page establishes a session, which is how the form is
+      // authenticated. The API path uses a bearer token instead, so both
+      // kinds of credential are exercised.
+      response.setHeader("Set-Cookie", `demo_session=${token}; Path=/; SameSite=Lax`);
+      // `?broken=1` serves a page that looks right but is not. See
+      // BROKEN_SCRIPT for why that is worth being able to ask for.
+      const variant =
+        url.searchParams.get("broken") === "1"
+          ? "broken"
+          : url.searchParams.get("noisy") === "1"
+            ? "noisy"
+            : "sound";
+      html(response, 200, page(state, variant));
       return;
     }
 
@@ -165,8 +238,11 @@ export async function startDemoApp(options: DemoOptions = {}): Promise<RunningDe
     }
 
     if (route === "POST /notifications") {
-      const authorization = request.headers.authorization;
-      if (authorization !== `Bearer ${token}`) {
+      const fromBrowser = (request.headers.accept ?? "").includes("text/html");
+      const authorized =
+        request.headers.authorization === `Bearer ${token}` ||
+        cookie(request, "demo_session") === token;
+      if (!authorized) {
         // Logged as a warning, not an error: a rejected request is the
         // service working, and tests for it assert on the rejection rather
         // than on the absence of noise.
@@ -205,6 +281,12 @@ export async function startDemoApp(options: DemoOptions = {}): Promise<RunningDe
       state.nextId += 1;
       state.notifications.push(notification);
       log("info", `accepted ${notification.id} for delivery over ${channel}`);
+      if (fromBrowser) {
+        // A page that is left looking at raw JSON after submitting a form is
+        // not a page anyone would ship.
+        response.writeHead(303, { Location: "/" }).end();
+        return;
+      }
       json(response, 201, { notification });
       return;
     }
