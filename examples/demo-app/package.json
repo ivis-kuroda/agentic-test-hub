@@ -1,0 +1,13 @@
+{
+  "name": "@agentic-test-hub/demo-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small application the hub tests itself against, unrelated to any real target",
+  "bin": {
+    "democtl": "./cli.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./server.ts"
+  }
+}
