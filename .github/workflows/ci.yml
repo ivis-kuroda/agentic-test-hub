@@ -123,8 +123,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Only the browser this suite uses, with the system libraries it needs.
+      # --no-shell skips chromium-headless-shell (~114MB): the runner
+      # launches full chromium in headless mode (see
+      # packages/runner/src/driver/playwright.ts), never the separate
+      # headless-shell binary, so it would only be downloaded and never
+      # used. Caching the browser binary itself was considered and
+      # rejected: most of this step's time is apt installing system
+      # libraries via --with-deps, which reruns on every job regardless of
+      # any binary cache (github-hosted runners are ephemeral), so a cache
+      # would only shave a few seconds off the download while adding a
+      # real risk of running against a stale or corrupted cached browser.
       - name: Install the browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps --no-shell chromium
 
       - name: End-to-end tests
         run: pnpm e2e
