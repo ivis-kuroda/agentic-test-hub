@@ -55,6 +55,15 @@ importers:
         specifier: ^4.6.2
         version: 4.6.2
 
+  packages/runner:
+    dependencies:
+      '@agentic-test-hub/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-test-hub/plugin':
+        specifier: workspace:*
+        version: link:../plugin
+
 packages:
 
   '@babel/helper-string-parser@7.29.7':
