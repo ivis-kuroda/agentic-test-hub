@@ -1,0 +1,29 @@
+{
+  "name": "@agentic-test-hub/hub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@agentic-test-hub/core": "workspace:*",
+    "@agentic-test-hub/plugin": "workspace:*",
+    "@agentic-test-hub/store": "workspace:*",
+    "@nuxt/ui": "^4.11.1",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^5.0.0",
+    "vue-tsc": "^3.3.11"
+  }
+}
