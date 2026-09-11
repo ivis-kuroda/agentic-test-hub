@@ -69,6 +69,8 @@ the thing is for, what the caller is responsible for, and anything surprising.
 - `docs/SPEC-MODEL.md` — the specification data model in detail.
 - `docs/ja/` — Japanese documents for human readers. Keep them in sync in
   substance, but they are not translations; they may differ in emphasis.
+  - `docs/ja/SETUP.md` — how to run this locally: install, start the web
+    editor, generate the reviewer view and delivery workbook, run the tests.
 
 ## Working agreement
 
