@@ -10,7 +10,10 @@ const automationColor: Record<string, "neutral" | "warning" | "success"> = {
 
 <template>
   <div class="max-w-4xl">
-    <h1 class="text-xl font-semibold mb-4">Cases</h1>
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-semibold">Cases</h1>
+      <UButton to="/cases/new" label="New case" />
+    </div>
 
     <UTable
       :data="data?.suite.cases ?? []"
@@ -23,6 +26,11 @@ const automationColor: Record<string, "neutral" | "warning" | "success"> = {
         { accessorKey: 'automation', header: 'Automation' },
       ]"
     >
+      <template #id-cell="{ row }">
+        <NuxtLink :to="`/cases/${row.original.id}`" class="hover:underline">
+          {{ row.original.id }}
+        </NuxtLink>
+      </template>
       <template #automation-cell="{ row }">
         <UBadge :color="automationColor[row.original.automation.status]" variant="subtle" size="sm">
           {{ row.original.automation.status }}
