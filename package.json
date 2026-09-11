@@ -14,6 +14,7 @@
     "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.20.2",
     "@typescript/native": "npm:typescript@^7.0.2",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",

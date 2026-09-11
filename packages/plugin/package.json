@@ -1,0 +1,20 @@
+{
+  "name": "@agentic-test-hub/plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentic-test-hub/core": "workspace:*",
+    "yaml": "^2.8.1",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}
