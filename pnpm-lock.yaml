@@ -33,6 +33,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@types/node@26.5.1)(@vitest/coverage-v8@5.0.0)(vite@7.3.6(@types/node@26.5.1)(yaml@2.9.0))
 
+  examples/demo-app: {}
+
   packages/core:
     dependencies:
       zod:
@@ -63,6 +65,10 @@ importers:
       '@agentic-test-hub/plugin':
         specifier: workspace:*
         version: link:../plugin
+    devDependencies:
+      '@agentic-test-hub/demo-app':
+        specifier: workspace:*
+        version: link:../../examples/demo-app
 
 packages:
 

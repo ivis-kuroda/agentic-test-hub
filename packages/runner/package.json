@@ -9,5 +9,8 @@
   "dependencies": {
     "@agentic-test-hub/core": "workspace:*",
     "@agentic-test-hub/plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentic-test-hub/demo-app": "workspace:*"
   }
 }

@@ -138,3 +138,29 @@ describe("checkAssertion", () => {
     expect(outcome.why).toBe("no duplicate rows remain");
   });
 });
+
+describe("text output from real commands", () => {
+  it("ignores the trailing newline a command prints", () => {
+    // A count command writes "0\n". Comparing that to 0 must succeed: the
+    // newline says nothing about the system under test.
+    expect(checkAssertion({ kind: "equals", value: 0 }, result({ stdout: "0\n" })).verdict).toBe(
+      "satisfied",
+    );
+  });
+
+  it("ignores surrounding whitespace generally", () => {
+    expect(
+      checkAssertion({ kind: "equals", value: "ready" }, result({ stdout: "  ready \n" })).verdict,
+    ).toBe("satisfied");
+  });
+
+  it("still distinguishes different values", () => {
+    expect(checkAssertion({ kind: "equals", value: 0 }, result({ stdout: "1\n" })).verdict).toBe(
+      "violated",
+    );
+  });
+
+  it("reports the trimmed subject, so the message is readable", () => {
+    expect(subjectOf(result({ stdout: "3\n" })).value).toBe("3");
+  });
+});
