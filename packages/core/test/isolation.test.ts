@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveIsolation, groupForExecution } from "../src/derive/isolation.js";
-import { cases, caseNoAuth, caseRetryOff, caseSms, makeCase } from "./fixtures.js";
+import { deriveIsolation, groupForExecution } from "../src/derive/isolation.ts";
+import { cases, caseNoAuth, caseRetryOff, caseSms, makeCase } from "./fixtures.ts";
 
 describe("deriveIsolation", () => {
   it("treats a request-shaped override as shareable", () => {

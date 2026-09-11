@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { TestCase } from "../src/schema/case.js";
-import { DEFAULT_EVIDENCE_PLAN } from "../src/schema/evidence.js";
-import { Expectation, isMechanical } from "../src/schema/expectation.js";
-import { Factor } from "../src/schema/factor.js";
-import { CaseId, StateRef, ViewpointId } from "../src/schema/id.js";
-import { Scenario } from "../src/schema/scenario.js";
-import { Viewpoint } from "../src/schema/viewpoint.js";
+import { TestCase } from "../src/schema/case.ts";
+import { DEFAULT_EVIDENCE_PLAN } from "../src/schema/evidence.ts";
+import { Expectation, isMechanical } from "../src/schema/expectation.ts";
+import { Factor } from "../src/schema/factor.ts";
+import { CaseId, StateRef, ViewpointId } from "../src/schema/id.ts";
+import { Scenario } from "../src/schema/scenario.ts";
+import { Viewpoint } from "../src/schema/viewpoint.ts";
 
 describe("identifiers", () => {
   it("accepts a prefixed, hyphenated identifier", () => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { Traceable } from "./common.js";
-import { OperationId } from "./id.js";
+import { Traceable } from "./common.ts";
+import { OperationId } from "./id.ts";
 
 /**
  * How the result of an operation is judged.

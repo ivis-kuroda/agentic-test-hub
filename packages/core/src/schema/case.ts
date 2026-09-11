@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { AppliesTo, Target, Traceable } from "./common.js";
-import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.js";
-import { Expectation } from "./expectation.js";
-import { BaselineId, CaseId, FactorId, LevelId } from "./id.js";
+import { AppliesTo, Target, Traceable } from "./common.ts";
+import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.ts";
+import { Expectation } from "./expectation.ts";
+import { BaselineId, CaseId, FactorId, LevelId } from "./id.ts";
 
 /**
  * A single difference between a case and its baseline.

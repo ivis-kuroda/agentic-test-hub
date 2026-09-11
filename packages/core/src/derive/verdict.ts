@@ -1,5 +1,5 @@
-import type { EvidenceSource, EvidenceWaiver, Polarity } from "../schema/evidence.js";
-import type { SourceCondition, VerdictPolicy } from "../schema/policy.js";
+import type { EvidenceSource, EvidenceWaiver, Polarity } from "../schema/evidence.ts";
+import type { SourceCondition, VerdictPolicy } from "../schema/policy.ts";
 
 /**
  * What one evidence channel actually showed.

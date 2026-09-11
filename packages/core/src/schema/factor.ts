@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FactorId, LevelId } from "./id.js";
+import { FactorId, LevelId } from "./id.ts";
 
 /**
  * One value a {@link Factor} can take.

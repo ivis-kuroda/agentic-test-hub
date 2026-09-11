@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateVerdict, validateWaivers, type Observation } from "../src/derive/verdict.js";
-import { DEFAULT_VERDICT_POLICY, VerdictPolicy } from "../src/schema/policy.js";
+import { evaluateVerdict, validateWaivers, type Observation } from "../src/derive/verdict.ts";
+import { DEFAULT_VERDICT_POLICY, VerdictPolicy } from "../src/schema/policy.ts";
 
 const clean = (source: Observation["source"], extra: Partial<Observation> = {}): Observation => ({
   source,

@@ -1,5 +1,5 @@
-import type { Baseline } from "../schema/baseline.js";
-import type { Override } from "../schema/case.js";
+import type { Baseline } from "../schema/baseline.ts";
+import type { Override } from "../schema/case.ts";
 
 /**
  * A value read from a resolved baseline, distinguishing "absent" from

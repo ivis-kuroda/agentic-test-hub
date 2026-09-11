@@ -9,11 +9,11 @@
  * The subject is a notification dispatch service: a request carries
  * credentials and names a delivery channel.
  */
-import { Baseline } from "../src/schema/baseline.js";
-import { TestCase } from "../src/schema/case.js";
-import { Factor } from "../src/schema/factor.js";
-import { Matrix } from "../src/schema/matrix.js";
-import { Viewpoint } from "../src/schema/viewpoint.js";
+import { Baseline } from "../src/schema/baseline.ts";
+import { TestCase } from "../src/schema/case.ts";
+import { Factor } from "../src/schema/factor.ts";
+import { Matrix } from "../src/schema/matrix.ts";
+import { Viewpoint } from "../src/schema/viewpoint.ts";
 
 /** The standard dispatch request every case in the family varies. */
 export const baseline = Baseline.parse({

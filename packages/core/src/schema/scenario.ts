@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { ActionRef } from "./baseline.js";
-import { AppliesTo, Target, Traceable } from "./common.js";
-import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.js";
-import { Expectation } from "./expectation.js";
-import { ScenarioId, StateRef, StepId } from "./id.js";
+import { ActionRef } from "./baseline.ts";
+import { AppliesTo, Target, Traceable } from "./common.ts";
+import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.ts";
+import { Expectation } from "./expectation.ts";
+import { ScenarioId, StateRef, StepId } from "./id.ts";
 
 /**
  * One judged action within a scenario.

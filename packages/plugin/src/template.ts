@@ -16,13 +16,13 @@ export interface TemplateScopes {
 
 /** A placeholder that could not be resolved. */
 export class TemplateError extends Error {
-  constructor(
-    message: string,
-    /** The placeholder text, without its braces. */
-    readonly placeholder: string,
-  ) {
+  /** The placeholder text, without its braces. */
+  readonly placeholder: string;
+
+  constructor(message: string, placeholder: string) {
     super(message);
     this.name = "TemplateError";
+    this.placeholder = placeholder;
   }
 }
 

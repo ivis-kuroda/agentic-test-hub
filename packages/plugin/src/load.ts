@@ -1,7 +1,7 @@
 import { parse as parseYaml } from "yaml";
 
-import { PluginManifest } from "./schema/manifest.js";
-import { collectPlaceholders } from "./template.js";
+import { PluginManifest } from "./schema/manifest.ts";
+import { collectPlaceholders } from "./template.ts";
 
 /** A manifest that parsed but does not hang together. */
 export interface IntegrityProblem {
@@ -111,13 +111,13 @@ export interface LoadedPlugin {
 
 /** A manifest that could not be loaded. */
 export class PluginLoadError extends Error {
-  constructor(
-    message: string,
-    /** Problems found, when the manifest parsed but did not cohere. */
-    readonly problems: readonly IntegrityProblem[] = [],
-  ) {
+  /** Problems found, when the manifest parsed but did not cohere. */
+  readonly problems: readonly IntegrityProblem[];
+
+  constructor(message: string, problems: readonly IntegrityProblem[] = []) {
     super(message);
     this.name = "PluginLoadError";
+    this.problems = problems;
   }
 }
 

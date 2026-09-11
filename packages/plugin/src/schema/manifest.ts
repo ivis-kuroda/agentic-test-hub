@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { EvidenceSource, OperationId, StateRef, VerdictPolicy } from "@agentic-test-hub/core";
 
-import { Connection } from "./connection.js";
-import { Operation } from "./operation.js";
-import { OperationCall, StateProvider } from "./state.js";
+import { Connection } from "./connection.ts";
+import { Operation } from "./operation.ts";
+import { OperationCall, StateProvider } from "./state.ts";
 
 /** Manifest format this hub understands. */
 export const PLUGIN_API_VERSION = "1";

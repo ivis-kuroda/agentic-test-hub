@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { Traceable } from "./common.js";
-import { FactorId, LevelId, MatrixId } from "./id.js";
+import { Traceable } from "./common.ts";
+import { FactorId, LevelId, MatrixId } from "./id.ts";
 
 /**
  * How much of the condition space a matrix intends to cover.

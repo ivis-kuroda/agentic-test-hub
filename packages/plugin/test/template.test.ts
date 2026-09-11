@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { collectPlaceholders, render, renderDeep, TemplateError } from "../src/template.js";
+import { collectPlaceholders, render, renderDeep, TemplateError } from "../src/template.ts";
 
 /** Runs a function and returns whatever it threw, so assertions stay unconditional. */
 function thrownBy(run: () => unknown): unknown {

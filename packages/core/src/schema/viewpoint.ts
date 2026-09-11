@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { Risk, SourceRef } from "./common.js";
-import { ViewpointId } from "./id.js";
+import { Risk, SourceRef } from "./common.ts";
+import { ViewpointId } from "./id.ts";
 
 /**
  * Something the suite sets out to establish, stated independently of how it

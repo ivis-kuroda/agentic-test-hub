@@ -1,4 +1,4 @@
-import type { Override, TestCase } from "../schema/case.js";
+import type { Override, TestCase } from "../schema/case.ts";
 
 /** Whether a case may share the environment prepared for its baseline. */
 export type Isolation = "shared" | "exclusive";

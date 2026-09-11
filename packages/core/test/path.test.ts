@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ABSENT, applyOverrides, getAtPath, removeAtPath, setAtPath } from "../src/derive/path.js";
-import { baseline } from "./fixtures.js";
+import { ABSENT, applyOverrides, getAtPath, removeAtPath, setAtPath } from "../src/derive/path.ts";
+import { baseline } from "./fixtures.ts";
 
 describe("getAtPath", () => {
   it("reads a nested value", () => {

@@ -12,14 +12,14 @@
  * Both groups derive from the same files; neither is generated from the
  * other.
  */
-export * from "./id.js";
-export * from "./common.js";
-export * from "./expectation.js";
-export * from "./evidence.js";
-export * from "./policy.js";
-export * from "./viewpoint.js";
-export * from "./factor.js";
-export * from "./matrix.js";
-export * from "./baseline.js";
-export * from "./case.js";
-export * from "./scenario.js";
+export * from "./id.ts";
+export * from "./common.ts";
+export * from "./expectation.ts";
+export * from "./evidence.ts";
+export * from "./policy.ts";
+export * from "./viewpoint.ts";
+export * from "./factor.ts";
+export * from "./matrix.ts";
+export * from "./baseline.ts";
+export * from "./case.ts";
+export * from "./scenario.ts";

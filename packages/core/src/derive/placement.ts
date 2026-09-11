@@ -1,8 +1,8 @@
-import { deepEqual } from "./equal.js";
-import { applyOverrides, getAtPath } from "./path.js";
-import type { Baseline } from "../schema/baseline.js";
-import type { TestCase } from "../schema/case.js";
-import type { Factor, Level } from "../schema/factor.js";
+import { deepEqual } from "./equal.ts";
+import { applyOverrides, getAtPath } from "./path.ts";
+import type { Baseline } from "../schema/baseline.ts";
+import type { TestCase } from "../schema/case.ts";
+import type { Factor, Level } from "../schema/factor.ts";
 
 /** Which level of each factor a case sits at. */
 export type Placement = Readonly<Record<string, string>>;

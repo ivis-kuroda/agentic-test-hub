@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { checkIntegrity, loadManifest, PluginLoadError } from "../src/load.js";
-import { PluginManifest } from "../src/schema/manifest.js";
-import { sampleManifest } from "./sample-manifest.js";
+import { checkIntegrity, loadManifest, PluginLoadError } from "../src/load.ts";
+import { PluginManifest } from "../src/schema/manifest.ts";
+import { sampleManifest } from "./sample-manifest.ts";
 
 /** Runs a function and returns whatever it threw, so assertions stay unconditional. */
 function thrownBy(run: () => unknown): unknown {

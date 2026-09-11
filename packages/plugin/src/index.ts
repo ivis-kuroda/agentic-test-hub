@@ -6,6 +6,6 @@
  * itself knows only four ways to act — run a command, make a request, query a
  * database, drive a browser — and nothing about any particular system.
  */
-export * from "./load.js";
-export * from "./schema/index.js";
-export * from "./template.js";
+export * from "./load.ts";
+export * from "./schema/index.ts";
+export * from "./template.ts";

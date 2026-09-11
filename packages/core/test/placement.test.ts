@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { derivePlacement, matchLevel } from "../src/derive/placement.js";
+import { derivePlacement, matchLevel } from "../src/derive/placement.ts";
 import {
   authFactor,
   baseline,
@@ -10,7 +10,7 @@ import {
   caseSms,
   factors,
   makeCase,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 
 describe("matchLevel", () => {
   it("matches a present value to the level holding it", () => {

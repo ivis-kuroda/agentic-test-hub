@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ViewpointId } from "./id.js";
+import { ViewpointId } from "./id.ts";
 
 /**
  * Where a claim in the specification comes from.

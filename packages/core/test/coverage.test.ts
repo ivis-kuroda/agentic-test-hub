@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMatrixView, buildViewpointCoverage } from "../src/derive/coverage.js";
-import { Matrix } from "../src/schema/matrix.js";
-import { baseline, cases, factors, matrix, viewpoints } from "./fixtures.js";
+import { buildMatrixView, buildViewpointCoverage } from "../src/derive/coverage.ts";
+import { Matrix } from "../src/schema/matrix.ts";
+import { baseline, cases, factors, matrix, viewpoints } from "./fixtures.ts";
 
 const suite = { factors, baselines: [baseline], cases };
 

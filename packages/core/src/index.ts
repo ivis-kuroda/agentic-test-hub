@@ -1,2 +1,2 @@
-export * from "./schema/index.js";
-export * from "./derive/index.js";
+export * from "./schema/index.ts";
+export * from "./derive/index.ts";

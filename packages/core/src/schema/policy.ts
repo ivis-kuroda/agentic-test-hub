@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { EvidenceSource, Polarity } from "./evidence.js";
+import { EvidenceSource, Polarity } from "./evidence.ts";
 
 /**
  * What a single evidence source must show for a test to pass.

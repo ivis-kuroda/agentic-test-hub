@@ -1,10 +1,10 @@
-import { derivePlacement } from "./placement.js";
-import type { Baseline } from "../schema/baseline.js";
-import type { TestCase } from "../schema/case.js";
-import type { Factor, Level } from "../schema/factor.js";
-import type { Exclusion, Matrix } from "../schema/matrix.js";
-import type { Scenario } from "../schema/scenario.js";
-import type { Viewpoint } from "../schema/viewpoint.js";
+import { derivePlacement } from "./placement.ts";
+import type { Baseline } from "../schema/baseline.ts";
+import type { TestCase } from "../schema/case.ts";
+import type { Factor, Level } from "../schema/factor.ts";
+import type { Exclusion, Matrix } from "../schema/matrix.ts";
+import type { Scenario } from "../schema/scenario.ts";
+import type { Viewpoint } from "../schema/viewpoint.ts";
 
 /** What a reviewer sees in one cell of a rendered matrix. */
 export type CellState =
