@@ -5,3 +5,9 @@ dist/
 
 # Run artifacts are never committed: they are large, binary and disposable.
 artifacts/
+
+# Playwright output.
+test-results/
+playwright-report/
+blob-report/
+.playwright/
