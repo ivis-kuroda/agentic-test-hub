@@ -11,3 +11,4 @@ export * from './equal.js';
 export * from './isolation.js';
 export * from './placement.js';
 export * from './coverage.js';
+export * from './verdict.js';
