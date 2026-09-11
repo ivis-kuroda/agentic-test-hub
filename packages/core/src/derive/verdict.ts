@@ -29,6 +29,15 @@ export interface Observation {
   readonly intendedChanges?: number;
   /** Rows changed that the case did not intend, including failed rollback. */
   readonly residualChanges?: number;
+  /**
+   * Entries filtered as pre-existing noise.
+   *
+   * Reported so the allowance stays visible. A channel that is clean only
+   * because forty entries were suppressed is a different situation from one
+   * that is genuinely quiet, and a number that grows over time is worth
+   * noticing before it hides something.
+   */
+  readonly suppressed?: number;
 }
 
 /** The outcome of judging a run against a policy. */
