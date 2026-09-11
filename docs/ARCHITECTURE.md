@@ -129,6 +129,48 @@ The delivery view re-creates presentational abbreviations such as "same as
 above" at render time by collapsing repeated values. Those abbreviations are a
 rendering concern; they never enter the source.
 
+## Evidence, and what a pass is allowed to rest on
+
+A screenshot shows what a page rendered. It cannot show that the service
+returned the status it should have, that the database changed as claimed, or
+that an exception was logged on the way. A suite that judges by appearance
+certifies systems whose backend failed quietly.
+
+So a verdict is reached across six channels — the rendered page, the browser
+console, the network exchange, the data before and after, the application log
+and the database log — and the rules for reading them are data, not runner
+behaviour, so that the standard a team holds itself to is reviewable.
+
+Three properties carry most of the weight:
+
+- **Success and rejection are judged by opposite rules.** A quiet application
+  log proves a success case and undermines a rejection case, where silence
+  means the system failed to reject what it should have. A case says which it
+  is; a runner cannot guess.
+- **Missing evidence is never a pass.** A channel that was supposed to be read
+  and was not yields `inconclusive`, so a broken collector shows up as a gap
+  instead of a green run.
+- **Weak evidence is never a pass on its own.** If the only channel that
+  decided the outcome is one the policy marks insufficient alone, the result
+  is `inconclusive`.
+
+Not every case can produce every kind of evidence, and a requirement that
+cannot be met gets switched off rather than met. So a case may waive a
+channel — but the escape is deliberately uncomfortable: one channel at a time,
+with a mandatory reason, never touching the channels the policy protects, and
+visible in the reviewer view, so that a case resting on thin evidence looks
+thin.
+
+What a policy protects is where a team's non-negotiables live. The defaults
+say a change must introduce no client-side errors, introduce no server-side
+errors, and leave the data as it claimed.
+
+One practical caveat: "no errors on this channel" is unusable against a mature
+application, where existing warnings would fail every case. Known pre-existing
+noise is filtered by pattern so the condition asks whether *this change*
+introduced anything — and suppressed entries are counted, so the allowance
+stays visible rather than quietly growing.
+
 ## AI at authoring time, deterministic code at run time
 
 Running an agent for every test execution is slow, expensive and
