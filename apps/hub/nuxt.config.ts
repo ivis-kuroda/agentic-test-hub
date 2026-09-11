@@ -7,9 +7,7 @@ import { fileURLToPath } from "node:url";
 // different depending on that — it did, until this was caught by actually
 // starting the dev server and finding an empty suite where the demo's should
 // have been.
-const DEFAULT_SPECS_ROOT = fileURLToPath(
-  new URL("../../examples/demo-app/specs", import.meta.url),
-);
+const DEFAULT_SPECS_ROOT = fileURLToPath(new URL("../../examples/demo-app/specs", import.meta.url));
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
