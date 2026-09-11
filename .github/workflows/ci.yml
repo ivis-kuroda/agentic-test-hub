@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  Lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -15,16 +15,13 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # Pinned in one place. Direct execution of TypeScript is what
-          # removes the build step, so the runtime version is load-bearing.
           node-version-file: .node-version
           cache: pnpm
 
-      - name: Report the runtime actually in use
-        run: node --version
-
       - run: pnpm install --frozen-lockfile
 
+      # Each check is its own step so a red build says which one objected
+      # without anyone opening the log.
       - name: Formatting
         run: pnpm fmt:check
 
@@ -34,8 +31,60 @@ jobs:
       - name: Types
         run: pnpm typecheck
 
-      - name: The hub must not know any specific target
+      - name: The hub must not name a specific target
         run: pnpm lint:no-target-coupling
 
-      - name: Tests
+  Test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Direct execution of TypeScript is what removes the build step, so
+          # the runtime version is load-bearing rather than incidental.
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Report the runtime actually in use
+        run: node --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Unit and integration tests
         run: pnpm test
+
+  E2E:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Only the browser this suite uses, with the system libraries it needs.
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm e2e
+
+      # Kept only when something failed, where the trace and screenshots are
+      # worth their size.
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
