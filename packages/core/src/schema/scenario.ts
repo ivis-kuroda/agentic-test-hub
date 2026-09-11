@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { ActionRef } from "./baseline.ts";
-import { AppliesTo, Target, Traceable } from "./common.ts";
+import { AppliesTo, Target, traceableFields } from "./common.ts";
 import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.ts";
 import { Expectation } from "./expectation.ts";
 import { ScenarioId, StateRef, StepId } from "./id.ts";
@@ -14,7 +14,7 @@ import { ScenarioId, StateRef, StepId } from "./id.ts";
  * result, date and tester, and it is the right granularity: a scenario that
  * fails at step 9 has still established steps 1 through 8.
  */
-export const Step = Traceable.extend({
+export const Step = z.object({
   id: StepId,
   /** What this step establishes, as the specification would phrase it. */
   summary: z.string().min(1),
@@ -43,6 +43,7 @@ export const Step = Traceable.extend({
    * "the item type created earlier" needs the identifier, not the sentence.
    */
   produces: z.record(z.string(), z.string()).default({}),
+  ...traceableFields,
 });
 /** One judged action within a scenario. */
 export type Step = z.infer<typeof Step>;
@@ -56,7 +57,7 @@ export type Step = z.infer<typeof Step>;
  * flattening one into the other loses either the ordering or the
  * independence.
  */
-export const Scenario = Traceable.extend({
+export const Scenario = z.object({
   id: ScenarioId,
   title: z.string().min(1),
   /**
@@ -79,6 +80,7 @@ export const Scenario = Traceable.extend({
   evidenceWaivers: z.array(EvidenceWaiver).default([]),
   tags: z.array(z.string().min(1)).default([]),
   appliesTo: AppliesTo.optional(),
+  ...traceableFields,
 });
 /** An ordered sequence of steps that share accumulated state. */
 export type Scenario = z.infer<typeof Scenario>;

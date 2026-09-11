@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { AppliesTo, Target, Traceable } from "./common.ts";
+import { AppliesTo, Target, traceableFields } from "./common.ts";
 import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.ts";
 import { Expectation } from "./expectation.ts";
 import { BaselineId, CaseId, FactorId, LevelId } from "./id.ts";
@@ -41,7 +41,7 @@ export const AutomationStatus = z.enum([
  * parallel. A sequence whose steps depend on earlier state is a
  * {@link Scenario} instead.
  */
-export const TestCase = Traceable.extend({
+export const TestCase = z.object({
   id: CaseId,
   /**
    * What distinguishes this case, phrased as the condition under test —
@@ -100,6 +100,7 @@ export const TestCase = Traceable.extend({
       impl: z.string().min(1).optional(),
     })
     .default({ status: "manual" }),
+  ...traceableFields,
 });
 /** One point in the condition space. */
 export type TestCase = z.infer<typeof TestCase>;

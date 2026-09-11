@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Traceable } from "./common.ts";
+import { traceableFields } from "./common.ts";
 import { FactorId, LevelId, MatrixId } from "./id.ts";
 
 /**
@@ -48,7 +48,7 @@ export type Exclusion = z.infer<typeof Exclusion>;
  * place to maintain the same fact — precisely the duplication this system
  * exists to remove.
  */
-export const Matrix = Traceable.extend({
+export const Matrix = z.object({
   id: MatrixId,
   title: z.string().min(1),
   /** Factors forming the rows and columns of the rendered table. */
@@ -60,6 +60,7 @@ export const Matrix = Traceable.extend({
   additional: z.array(FactorId).default([]),
   strategy: CoverageStrategy.default("single_factor"),
   exclusions: z.array(Exclusion).default([]),
+  ...traceableFields,
 });
 /** A two-dimensional projection of the condition space, for review. */
 export type Matrix = z.infer<typeof Matrix>;

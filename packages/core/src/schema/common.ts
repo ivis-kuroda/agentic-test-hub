@@ -53,12 +53,22 @@ export type Target = z.infer<typeof Target>;
  * exist" downward and "where is this verified" upward, and coverage reporting
  * is built entirely from it.
  */
-export const Traceable = z.object({
+export const traceableFields = {
   /** Viewpoints this entity contributes evidence for. */
   viewpoints: z.array(ViewpointId).default([]),
   /** Free-form remark carried through to generated views. */
   note: z.string().optional(),
-});
+} as const;
+
+/**
+ * Fields shared by every entity in the reviewer view, as a schema.
+ *
+ * Spread {@link traceableFields} instead when composing an entity, so that
+ * its own identity leads. Key order is the order a reviewer reads a diff in,
+ * and a file whose first line is `viewpoints:` rather than `id:` is harder to
+ * scan for no benefit.
+ */
+export const Traceable = z.object(traceableFields);
 
 /**
  * Version of the target application a specification applies to.
