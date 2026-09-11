@@ -88,6 +88,18 @@ importers:
         specifier: workspace:*
         version: link:../../examples/demo-app
 
+  packages/store:
+    dependencies:
+      '@agentic-test-hub/core':
+        specifier: workspace:*
+        version: link:../core
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.0
+      zod:
+        specifier: ^4.6.2
+        version: 4.6.2
+
 packages:
 
   '@babel/helper-string-parser@7.29.7':
