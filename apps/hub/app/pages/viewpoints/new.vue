@@ -1,43 +1,28 @@
 <script setup lang="ts">
 import type { ViewpointDraft } from "~/components/ViewpointEditor.vue";
 
-const draft = ref<ViewpointDraft>({
-  id: "",
-  title: "",
-  rationale: "",
-  risk: "medium",
-  source: [{ kind: "design", ref: "", note: "" }],
-  parents: [],
-});
-
-const saving = ref(false);
-const errorMessage = ref<string>();
 const router = useRouter();
 const toast = useToast();
 
-async function save(): Promise<void> {
-  saving.value = true;
-  errorMessage.value = undefined;
+const { draft, saving, errorMessage, conflict, save } = useEntityEditor<ViewpointDraft>(
+  "viewpoint",
+  {
+    id: "",
+    title: "",
+    rationale: "",
+    risk: "medium",
+    source: [{ kind: "design", ref: "", note: "" }],
+    parents: [],
+  },
+);
+
+async function create(): Promise<void> {
   try {
-    await $fetch("/api/viewpoints", {
-      method: "PUT",
-      body: {
-        entity: {
-          ...draft.value,
-          source: draft.value.source.map((entry) => ({
-            kind: entry.kind,
-            ref: entry.ref,
-            ...(entry.note === "" ? {} : { note: entry.note }),
-          })),
-        },
-      },
-    });
+    await save();
     toast.add({ title: "Viewpoint created", color: "success" });
     await router.push(`/viewpoints/${draft.value.id}`);
-  } catch (cause) {
-    errorMessage.value = extractErrorMessage(cause);
-  } finally {
-    saving.value = false;
+  } catch {
+    // errorMessage / conflict already hold the reason; nothing further to do.
   }
 }
 </script>
@@ -54,9 +39,10 @@ async function save(): Promise<void> {
       :title="errorMessage"
       class="max-w-2xl mt-4"
     />
+    <ConflictAlert :conflict="conflict" @overwrite="create" />
 
     <div class="mt-6">
-      <UButton label="Create" :loading="saving" @click="save" />
+      <UButton label="Create" :loading="saving" @click="create" />
     </div>
   </div>
 </template>
