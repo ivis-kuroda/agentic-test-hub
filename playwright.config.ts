@@ -16,8 +16,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env["CI"]),
   // One retry, to distinguish a genuine failure from a browser that lost a
   // race. Anything failing twice is real.
-  retries: Boolean(process.env["CI"]) ? 1 : 0,
-  reporter: Boolean(process.env["CI"]) ? [["list"], ["html", { open: "never" }]] : [["list"]],
+  retries: process.env["CI"] ? 1 : 0,
+  reporter: process.env["CI"] ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     // Kept for the retry, where they earn their size.
     trace: "on-first-retry",
