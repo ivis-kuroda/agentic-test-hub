@@ -1,0 +1,12 @@
+{
+  "name": "@agentic-test-hub/export",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agentic-test-hub/core": "workspace:*"
+  }
+}

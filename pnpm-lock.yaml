@@ -14,6 +14,9 @@ importers:
       '@agentic-test-hub/demo-app':
         specifier: workspace:*
         version: link:examples/demo-app
+      '@agentic-test-hub/export':
+        specifier: workspace:*
+        version: link:packages/export
       '@agentic-test-hub/plugin':
         specifier: workspace:*
         version: link:packages/plugin
@@ -62,6 +65,12 @@ importers:
       '@types/node':
         specifier: ^22.20.2
         version: 22.20.2
+
+  packages/export:
+    dependencies:
+      '@agentic-test-hub/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/plugin:
     dependencies:
