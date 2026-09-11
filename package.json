@@ -4,13 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "oxlint --type-aware",
+    "lint": "pnpm lint:packages && pnpm lint:apps",
+    "lint:packages": "oxlint --type-aware --ignore-pattern apps/**",
+    "lint:apps": "oxlint --type-aware apps",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check .",
-    "typecheck": "oxlint -A all --type-aware --type-check",
+    "typecheck": "pnpm typecheck:packages && pnpm typecheck:apps",
+    "typecheck:packages": "oxlint -A all --type-aware --type-check --ignore-pattern apps/**",
+    "typecheck:apps": "pnpm --filter @agentic-test-hub/hub typecheck",
     "test": "vitest run",
-    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm hub:typecheck && pnpm lint:no-target-coupling && pnpm test",
+    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm lint:no-target-coupling && pnpm test",
     "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -20,8 +24,7 @@
     "specs:normalise": "node scripts/normalise-specs.ts examples/demo-app/specs",
     "specs:validate": "node scripts/validate-specs.ts examples/demo-app/specs",
     "specs:review": "node scripts/render-reviewer-view.ts examples/demo-app/specs /tmp/reviewer-view.html \"Demo dispatch service — test specification review\"",
-    "specs:excel": "node scripts/render-delivery-excel.ts examples/demo-app/specs /tmp/delivery.xlsx",
-    "hub:typecheck": "pnpm --filter @agentic-test-hub/hub typecheck"
+    "specs:excel": "node scripts/render-delivery-excel.ts examples/demo-app/specs /tmp/delivery.xlsx"
   },
   "devDependencies": {
     "@agentic-test-hub/core": "workspace:*",
