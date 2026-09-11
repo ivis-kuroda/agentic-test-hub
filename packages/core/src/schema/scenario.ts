@@ -3,6 +3,7 @@ import { ScenarioId, StateRef, StepId } from './id.js';
 import { AppliesTo, Target, Traceable } from './common.js';
 import { Expectation } from './expectation.js';
 import { ActionRef } from './baseline.js';
+import { EvidencePlan, Polarity } from './evidence.js';
 
 /**
  * One judged action within a scenario.
@@ -22,6 +23,8 @@ export const Step = Traceable.extend({
   action: ActionRef.optional(),
   /** What must hold after the action. */
   expect: z.array(Expectation).min(1),
+  /** Whether this step expects success or expects to be rejected. */
+  polarity: Polarity.default('nominal'),
   /**
    * Steps that must have run first.
    *
@@ -65,6 +68,8 @@ export const Scenario = Traceable.extend({
   preconditions: z.array(StateRef).default([]),
   /** Steps in the order they must run. */
   steps: z.array(Step).min(1),
+  /** Overrides the suite's default evidence collection for this scenario. */
+  evidence: EvidencePlan.optional(),
   tags: z.array(z.string().min(1)).default([]),
   appliesTo: AppliesTo.optional(),
 });

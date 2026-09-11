@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BaselineId, CaseId, FactorId, LevelId } from './id.js';
 import { AppliesTo, Target, Traceable } from './common.js';
 import { Expectation } from './expectation.js';
+import { EvidencePlan, Polarity } from './evidence.js';
 
 /**
  * A single difference between a case and its baseline.
@@ -57,6 +58,16 @@ export const TestCase = Traceable.extend({
    * Required and non-empty: a case with nothing to check is not a test.
    */
   expect: z.array(Expectation).min(1),
+  /**
+   * Whether the case expects success or expects to be rejected.
+   *
+   * Determines which verdict rules apply: a quiet application log proves a
+   * success case and undermines a rejection case, where silence means the
+   * system failed to reject what it should have.
+   */
+  polarity: Polarity.default('nominal'),
+  /** Overrides the suite's default evidence collection for this case. */
+  evidence: EvidencePlan.optional(),
   /**
    * Explicit placement on a matrix axis.
    *
