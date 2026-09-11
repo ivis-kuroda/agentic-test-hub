@@ -1,0 +1,12 @@
+id: F-RECIPIENT
+name: recipient
+description: whether the request names who the notification is for
+path: context.body.recipient
+levels:
+  - id: L-PRESENT
+    name: present
+    value: someone@example.invalid
+    absent: false
+  - id: L-ABSENT
+    name: not sent
+    absent: true

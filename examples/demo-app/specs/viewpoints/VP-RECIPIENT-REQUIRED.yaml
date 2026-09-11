@@ -1,0 +1,9 @@
+id: VP-RECIPIENT-REQUIRED
+title: a notification must name a recipient
+rationale: A request accepted without a recipient would create a notification that can never be delivered to anyone, silently wasting the send and hiding the mistake from the caller.
+source:
+  - kind: code
+    ref: examples/demo-app/server.ts:handle (POST /notifications)
+    note: rejects with 400 "recipient is required" when the recipient field is empty or not a string
+risk: medium
+parents: []

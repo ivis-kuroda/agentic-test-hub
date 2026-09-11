@@ -1,0 +1,24 @@
+id: TC-DISPATCH-006
+summary: a request with no recipient is rejected
+baseline: BL-DISPATCH-STD
+overrides:
+  - path: context.body.recipient
+    op: remove
+expect:
+  - kind: http_status
+    status: 400
+    viewpoints:
+      - VP-RECIPIENT-REQUIRED
+  - kind: error_message
+    value: recipient is required
+    match: contains
+    viewpoints:
+      - VP-RECIPIENT-REQUIRED
+polarity: error
+evidenceWaivers: []
+priority: P1
+tags: []
+automation:
+  status: manual
+viewpoints:
+  - VP-RECIPIENT-REQUIRED
