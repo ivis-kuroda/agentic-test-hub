@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Pinned in one place. Direct execution of TypeScript is what
+          # removes the build step, so the runtime version is load-bearing.
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Report the runtime actually in use
+        run: node --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Formatting
+        run: pnpm fmt:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Types
+        run: pnpm typecheck
+
+      - name: The hub must not know any specific target
+        run: pnpm lint:no-target-coupling
+
+      - name: Tests
+        run: pnpm test

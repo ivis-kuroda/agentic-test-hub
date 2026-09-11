@@ -10,7 +10,7 @@
     "fmt:check": "oxfmt --check .",
     "typecheck": "oxlint -A all --type-aware --type-check",
     "test": "vitest run",
-    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm lint:no-target-coupling && pnpm test",
     "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
