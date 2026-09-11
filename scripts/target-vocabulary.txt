@@ -1,0 +1,11 @@
+# Terms that must not appear in hub source.
+#
+# One per line, case-insensitive. Add a target's name here when a plugin for
+# it is created, so that the hub cannot quietly grow knowledge of it.
+#
+# Keep entries distinctive. A term that collides with ordinary English will
+# produce false positives, and the response to those is to make the term more
+# specific, never to delete the check.
+weko
+invenio
+swordserver
