@@ -20,7 +20,7 @@ export function emptyCaseDraft(): CaseDraft {
     evidenceIgnore: [],
     evidenceWaivers: [],
     at: [],
-    isolation: "",
+    isolation: "auto",
     priority: "P2",
     tags: [],
     appliesToCommit: "",
@@ -55,7 +55,7 @@ export function caseDraftFromEntity(entity: TestCase): CaseDraft {
     evidenceIgnore: entity.evidence?.ignore ?? [],
     evidenceWaivers: entity.evidenceWaivers.map((waiver) => ({ ...waiver })),
     at: Object.entries(entity.at ?? {}).map(([factorId, levelId]) => ({ factorId, levelId })),
-    isolation: entity.isolation ?? "",
+    isolation: entity.isolation ?? "auto",
     priority: entity.priority,
     tags: [...entity.tags],
     appliesToCommit: entity.appliesTo?.commit ?? "",
@@ -103,7 +103,7 @@ export function caseDraftToEntity(draft: CaseDraft): unknown {
     ...(draft.at.length === 0
       ? {}
       : { at: Object.fromEntries(draft.at.map((term) => [term.factorId, term.levelId])) }),
-    ...(draft.isolation === "" ? {} : { isolation: draft.isolation }),
+    ...(draft.isolation === "auto" ? {} : { isolation: draft.isolation }),
     priority: draft.priority,
     tags: draft.tags,
     ...(draft.appliesToCommit === "" &&

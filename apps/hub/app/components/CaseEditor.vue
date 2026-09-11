@@ -30,7 +30,7 @@ export interface CaseDraft {
   evidenceIgnore: string[];
   evidenceWaivers: { source: string; reason: string }[];
   at: { factorId: string; levelId: string }[];
-  isolation: "" | "shared" | "exclusive";
+  isolation: "auto" | "shared" | "exclusive";
   priority: "P1" | "P2" | "P3";
   tags: string[];
   appliesToCommit: string;
@@ -254,7 +254,7 @@ function removeTag(index: number): void {
         <USelect
           v-model="model.isolation"
           :items="[
-            { label: '(derive)', value: '' },
+            { label: '(derive)', value: 'auto' },
             { label: 'shared', value: 'shared' },
             { label: 'exclusive', value: 'exclusive' },
           ]"

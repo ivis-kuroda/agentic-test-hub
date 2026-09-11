@@ -81,7 +81,7 @@ function removeExpectation(index: number): void {
         <USelect
           v-model="expectation.stream"
           :items="[
-            { label: '(both)', value: '' },
+            { label: '(both)', value: 'both' },
             { label: 'stdout', value: 'stdout' },
             { label: 'stderr', value: 'stderr' },
           ]"
