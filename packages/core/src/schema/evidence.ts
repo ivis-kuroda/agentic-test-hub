@@ -67,9 +67,44 @@ export const EvidencePlan = z.object({
    * keeps them for failures, where they are worth their size.
    */
   trace: z.enum(["always", "on_failure", "never"]).default("on_failure"),
+  /**
+   * Regular expressions matching log and console output that is already
+   * present before the change under test.
+   *
+   * Without this, "no errors on this channel" is unusable against a mature
+   * application: existing warnings would fail every case, and the usual
+   * response is to stop looking at the channel entirely. Filtering known
+   * noise keeps the condition meaningful — it asks whether *this change*
+   * introduced anything, which is the question worth asking.
+   *
+   * Suppressed entries are counted and reported, so the allowance stays
+   * visible rather than quietly growing.
+   */
+  ignore: z.array(z.string().min(1)).default([]),
 });
 /** What evidence to collect for a case or scenario, and when. */
 export type EvidencePlan = z.infer<typeof EvidencePlan>;
 
 /** Collection settings with every default filled in. */
 export const DEFAULT_EVIDENCE_PLAN: EvidencePlan = EvidencePlan.parse({});
+
+/**
+ * Permission for one case to be judged without one evidence channel.
+ *
+ * Not every case can produce every kind of evidence: some exercise paths that
+ * touch no data, some run where a log is unavailable. Forcing those to
+ * declare evidence they cannot supply would make the requirement a formality,
+ * and formalities get switched off.
+ *
+ * The escape is deliberately uncomfortable. A waiver names one channel,
+ * demands a reason, cannot touch the channels a policy protects, and shows up
+ * in the reviewer view — so a case resting on thin evidence looks thin.
+ */
+export const EvidenceWaiver = z.object({
+  /** The channel this case will not be judged on. */
+  source: EvidenceSource,
+  /** Why this case cannot supply it. Shown to reviewers verbatim. */
+  reason: z.string().min(1),
+});
+/** Permission for one case to be judged without one evidence channel. */
+export type EvidenceWaiver = z.infer<typeof EvidenceWaiver>;

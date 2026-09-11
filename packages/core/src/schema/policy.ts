@@ -52,6 +52,16 @@ export const VerdictPolicy = z.object({
    * backends and one that photographs them looking fine.
    */
   insufficientAlone: z.array(EvidenceSource).default(["screenshot"]),
+  /**
+   * Channels no case may waive, whatever its reason.
+   *
+   * This is where a team's non-negotiables live. The defaults say that a
+   * change must not introduce client-side errors, must not introduce
+   * server-side errors, and must leave the data in the state it claimed —
+   * three things a screenshot cannot show and which no individual case gets
+   * to opt out of.
+   */
+  nonWaivable: z.array(EvidenceSource).default(["browser_console", "app_log", "db_records"]),
 });
 /** The rules by which collected evidence becomes a verdict. */
 export type VerdictPolicy = z.infer<typeof VerdictPolicy>;
