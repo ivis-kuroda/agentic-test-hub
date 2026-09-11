@@ -20,8 +20,17 @@ export interface EditorConflict {
  * @param kind - The entity's kind, used to address the generic API route.
  * @param initial - The entity to start editing from.
  * @param initialHash - The hash last seen for it. Omit when creating.
+ * @param toEntity - Converts the draft to what actually gets saved, for a
+ *   draft shape that is not itself valid against the schema (e.g. a factor
+ *   level's value edited as text but saved as its parsed JSON). Defaults to
+ *   the draft as-is.
  */
-export function useEntityEditor<T>(kind: EntityKind, initial: T, initialHash?: string) {
+export function useEntityEditor<T>(
+  kind: EntityKind,
+  initial: T,
+  initialHash?: string,
+  toEntity: (draft: T) => unknown = (draft) => draft,
+) {
   const draft = ref(structuredClone(initial)) as Ref<T>;
   const hash = ref(initialHash);
   const saving = ref(false);
@@ -47,7 +56,7 @@ export function useEntityEditor<T>(kind: EntityKind, initial: T, initialHash?: s
     errorMessage.value = undefined;
     try {
       const expectedHash = options.force ? conflict.value?.actualHash : hash.value;
-      const result = await saveSpecEntity(kind, draft.value, expectedHash);
+      const result = await saveSpecEntity(kind, toEntity(draft.value), expectedHash);
       hash.value = result.hash;
       conflict.value = undefined;
       return result;
