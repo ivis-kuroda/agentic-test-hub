@@ -13,6 +13,7 @@ const DEFAULT_SPECS_ROOT = fileURLToPath(new URL("../../examples/demo-app/specs"
 export default defineNuxtConfig({
   modules: ["@nuxt/ui"],
   css: ["~/assets/main.css"],
+  compatibilityDate: "2026-09-11",
   future: { compatibilityVersion: 4 },
   devtools: { enabled: true },
   runtimeConfig: {
