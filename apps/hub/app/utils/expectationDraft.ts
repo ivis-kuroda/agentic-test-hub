@@ -26,7 +26,7 @@ export interface ExpectationDraft {
   value: string;
   match: "exact" | "contains" | "regex";
   scope: string;
-  stream: "" | "stdout" | "stderr";
+  stream: "both" | "stdout" | "stderr";
   operation: string;
   params: string;
   assertKind: "equals" | "contains" | "matches" | "row_count" | "natural";
@@ -49,7 +49,7 @@ export function newExpectationDraft(): ExpectationDraft {
     value: "",
     match: "contains",
     scope: "",
-    stream: "",
+    stream: "both",
     operation: "",
     params: "{}",
     assertKind: "contains",
@@ -85,7 +85,7 @@ export function expectationDraftFromEntity(expectation: Expectation): Expectatio
       break;
     case "stdout_contains":
       draft.value = expectation.value;
-      draft.stream = expectation.stream ?? "";
+      draft.stream = expectation.stream ?? "both";
       break;
     case "operation_result":
       draft.operation = expectation.operation;
@@ -163,7 +163,7 @@ export function expectationToEntity(expectation: ExpectationDraft): unknown {
       return {
         kind: "stdout_contains",
         value: expectation.value,
-        ...(expectation.stream === "" ? {} : { stream: expectation.stream }),
+        ...(expectation.stream === "both" ? {} : { stream: expectation.stream }),
         ...shared,
       };
     case "operation_result":

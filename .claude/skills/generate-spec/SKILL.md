@@ -80,21 +80,38 @@ pnpm specs:validate   # cross-references resolve (viewpoints, factors, baseline,
 Fix anything either script flags before handing off — do not hand a human a
 draft that fails the suite's own mechanical checks.
 
-## Handoff: review gates saving, not just drafting
+## Handoff: review gates merging, not drafting
 
 Writing the file to disk is necessary for the hub to display it at all, but
-that is not the same as it being accepted. **Never `git commit` or `git push`
-generated spec files on your own initiative.** Leave them as uncommitted
-changes and tell the human explicitly:
+that is not the same as it being accepted into the suite's history.
 
-- What you generated (each entity id, one line of rationale, and its source).
-- Where to review it: `pnpm dev` in `apps/hub`, then the relevant
-  `/viewpoints`, `/factors`, `/matrices`, `/baselines`, `/cases`, `/scenarios`
-  page for each kind you touched.
-- Any open decision you deliberately did not make (matrix strategy, above
-  all).
-- That nothing is committed yet, and you are waiting for their review before
-  it becomes part of the suite's history.
+**This work runs in an ephemeral, agent-driven environment.** Leaving files
+uncommitted is not a safe "awaiting review" state here: the human may be
+working from a different session or machine entirely and cannot see this
+working tree, an uncommitted change can be lost outright if the environment
+is reset, and a stop hook in this repository refuses to end a turn with
+untracked files present. So drafting is never "write it and stop" — it always
+ends in a push, just not to the branch that is driving toward merge:
 
-If the human asks you to commit after reviewing, commit then — same as any
-other change in this repository (see `docs/GIT.md`).
+1. From the current branch, create a new branch scoped to the proposal (for
+   example `spec-draft/<short-description>`), commit the generated files
+   there with a message that says plainly this is a machine-generated
+   proposal awaiting review, and push it.
+2. Return to the branch you started from (`git checkout -`) so it is left
+   clean, matching how the rest of this repository's work is committed (see
+   `docs/GIT.md`).
+3. Tell the human explicitly:
+   - What you generated (each entity id, one line of rationale, and its
+     source), and the branch name you pushed it to.
+   - How to review it: check out that branch and `pnpm dev` in `apps/hub` to
+     open the relevant `/viewpoints`, `/factors`, `/matrices`, `/baselines`,
+     `/cases`, `/scenarios` page for each kind you touched, or read the diff
+     directly.
+   - Any open decision you deliberately did not make (matrix strategy, above
+     all).
+   - That it is on a separate branch and not merged anywhere; merging or
+     discarding it is their call.
+
+Never commit a generated draft directly onto the branch you were asked to
+develop on, and never merge or open a PR for the draft branch yourself — that
+is what review is for.
