@@ -20,6 +20,9 @@ importers:
       '@agentic-test-hub/runner':
         specifier: workspace:*
         version: link:packages/runner
+      '@agentic-test-hub/store':
+        specifier: workspace:*
+        version: link:packages/store
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0

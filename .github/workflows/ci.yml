@@ -34,6 +34,12 @@ jobs:
       - name: The hub must not name a specific target
         run: pnpm lint:no-target-coupling
 
+      - name: Specifications are in canonical form
+        run: pnpm specs:check
+
+      - name: Specifications hold together
+        run: pnpm specs:validate
+
   Test:
     runs-on: ubuntu-latest
     steps:

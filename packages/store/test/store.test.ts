@@ -102,16 +102,16 @@ describe("concurrent edits", () => {
       toYaml({ ...viewpoint, title: "edited elsewhere" }, Viewpoint),
       "utf8",
     );
-    try {
-      await store.save({
+    const error = await store
+      .save({
         kind: "viewpoint",
         entity: { ...viewpoint, title: "mine" },
         expectedHash: first.hash,
-      });
-      expect.unreachable("should have refused");
-    } catch (error) {
-      expect((error as ConflictError).current).toContain("edited elsewhere");
-    }
+      })
+      .then(() => undefined)
+      .catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConflictError);
+    expect((error as ConflictError).current).toContain("edited elsewhere");
   });
 
   it("treats a save with no hash over an existing file as a conflict, not consent", async () => {

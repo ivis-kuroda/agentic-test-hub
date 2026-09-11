@@ -15,13 +15,17 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "specs:check": "node scripts/check-spec-round-trip.ts examples/demo-app/specs",
+    "specs:normalise": "node scripts/normalise-specs.ts examples/demo-app/specs",
+    "specs:validate": "node scripts/validate-specs.ts examples/demo-app/specs"
   },
   "devDependencies": {
     "@agentic-test-hub/core": "workspace:*",
     "@agentic-test-hub/demo-app": "workspace:*",
     "@agentic-test-hub/plugin": "workspace:*",
     "@agentic-test-hub/runner": "workspace:*",
+    "@agentic-test-hub/store": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",
     "@typescript/native": "npm:typescript@^7.0.2",
