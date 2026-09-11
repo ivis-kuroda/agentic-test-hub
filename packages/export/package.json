@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@agentic-test-hub/core": "workspace:*"
+    "@agentic-test-hub/core": "workspace:*",
+    "exceljs": "^4.4.0"
   }
 }
