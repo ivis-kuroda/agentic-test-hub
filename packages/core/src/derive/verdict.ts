@@ -1,4 +1,4 @@
-import type { EvidenceSource, Polarity } from "../schema/evidence.js";
+import type { EvidenceSource, EvidenceWaiver, Polarity } from "../schema/evidence.js";
 import type { SourceCondition, VerdictPolicy } from "../schema/policy.js";
 
 /**
@@ -56,6 +56,13 @@ export interface VerdictResult {
   readonly missing: readonly EvidenceSource[];
   /** Sources that actually carried the decision. */
   readonly decidedBy: readonly EvidenceSource[];
+  /**
+   * Sources this case was excused from, and why.
+   *
+   * Reported rather than silently dropped: a verdict reached on fewer
+   * channels is a weaker verdict, and the reviewer view says so.
+   */
+  readonly waived: readonly EvidenceWaiver[];
 }
 
 function checkCondition(condition: SourceCondition, observation: Observation): string | undefined {
@@ -120,18 +127,35 @@ export function evaluateVerdict(
   policy: VerdictPolicy,
   polarity: Polarity,
   observations: readonly Observation[],
+  waivers: readonly EvidenceWaiver[] = [],
 ): VerdictResult {
   const rules = policy.rules[polarity] ?? {};
   const seen = new Map(observations.map((observation) => [observation.source, observation]));
+  const waivedBySource = new Map(waivers.map((waiver) => [waiver.source, waiver]));
 
   const failures: ConditionFailure[] = [];
   const missing: EvidenceSource[] = [];
   const decidedBy: EvidenceSource[] = [];
+  const waived: EvidenceWaiver[] = [];
 
   for (const [rawSource, rawCondition] of Object.entries(rules)) {
     const source = rawSource as EvidenceSource;
     const condition = rawCondition as SourceCondition;
     if (condition === "informational") continue;
+
+    const waiver = waivedBySource.get(source);
+    if (waiver) {
+      if (policy.nonWaivable.includes(source)) {
+        failures.push({
+          source,
+          condition,
+          why: `this channel cannot be waived: ${waiver.reason}`,
+        });
+      } else {
+        waived.push(waiver);
+      }
+      continue;
+    }
 
     const observation = seen.get(source);
     if (!observation || !observation.collected) {
@@ -145,17 +169,44 @@ export function evaluateVerdict(
   }
 
   if (failures.length > 0) {
-    return { verdict: "fail", failures, missing, decidedBy };
+    return { verdict: "fail", failures, missing, decidedBy, waived };
   }
   if (missing.length > 0) {
-    return { verdict: "inconclusive", failures, missing, decidedBy };
+    return { verdict: "inconclusive", failures, missing, decidedBy, waived };
   }
 
   const weakOnly =
     decidedBy.length > 0 && decidedBy.every((source) => policy.insufficientAlone.includes(source));
   if (decidedBy.length === 0 || weakOnly) {
-    return { verdict: "inconclusive", failures, missing, decidedBy };
+    return { verdict: "inconclusive", failures, missing, decidedBy, waived };
   }
 
-  return { verdict: "pass", failures, missing, decidedBy };
+  return { verdict: "pass", failures, missing, decidedBy, waived };
+}
+
+/** A waiver a policy does not permit. */
+export interface WaiverProblem {
+  readonly source: EvidenceSource;
+  readonly reason: string;
+}
+
+/**
+ * Checks a case's waivers against a policy, for validation ahead of any run.
+ *
+ * Catching an impermissible waiver when the specification is saved is worth
+ * more than catching it when the suite runs: the person who wrote it is still
+ * there, and no run has yet been reported on evidence the team had already
+ * decided was mandatory.
+ *
+ * @param policy - Policy the case will be judged under.
+ * @param waivers - Waivers the case declares.
+ * @returns The waivers the policy forbids; empty when all are permitted.
+ */
+export function validateWaivers(
+  policy: VerdictPolicy,
+  waivers: readonly EvidenceWaiver[],
+): WaiverProblem[] {
+  return waivers
+    .filter((waiver) => policy.nonWaivable.includes(waiver.source))
+    .map((waiver) => ({ source: waiver.source, reason: waiver.reason }));
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { AppliesTo, Target, Traceable } from "./common.js";
-import { EvidencePlan, Polarity } from "./evidence.js";
+import { EvidencePlan, EvidenceWaiver, Polarity } from "./evidence.js";
 import { Expectation } from "./expectation.js";
 import { BaselineId, CaseId, FactorId, LevelId } from "./id.js";
 
@@ -69,6 +69,12 @@ export const TestCase = Traceable.extend({
   polarity: Polarity.default("nominal"),
   /** Overrides the suite's default evidence collection for this case. */
   evidence: EvidencePlan.optional(),
+  /**
+   * Channels this case will not be judged on, each with a reason.
+   *
+   * Validated against the policy: waiving a protected channel is rejected.
+   */
+  evidenceWaivers: z.array(EvidenceWaiver).default([]),
   /**
    * Explicit placement on a matrix axis.
    *
