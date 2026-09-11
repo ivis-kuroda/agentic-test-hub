@@ -9,20 +9,24 @@
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check .",
     "typecheck": "oxlint -A all --type-aware --type-check",
-    "test": "pnpm -r --stream test",
+    "test": "vitest run",
     "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test",
-    "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs"
+    "lint:no-target-coupling": "node scripts/check-no-target-coupling.mjs",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@types/node": "^22.20.2",
+    "@types/node": "^26.5.1",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "@vitest/coverage-v8": "^5.0.0",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
     "oxlint-tsgolint": "^7.0.2001",
-    "typescript": "npm:@typescript/typescript6@^6.0.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^5.0.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "packageManager": "pnpm@10.33.0"
 }
