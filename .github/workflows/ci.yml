@@ -7,6 +7,11 @@ on:
 
 jobs:
   Lint:
+    # Static checks over packages/*, examples/*, scripts and root configs —
+    # everything that runs on the node directly, without a bundler. apps/*
+    # gets its own job: a Nuxt project needs its own tools for some of this
+    # (see the Apps job below), and keeping the two apart means a failure
+    # here is never "which half broke, packages or the app".
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,17 +31,10 @@ jobs:
         run: pnpm fmt:check
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm lint:packages
 
       - name: Types
-        run: pnpm typecheck
-
-      - name: Nuxt app types
-        # A standalone type checker cannot resolve Nuxt and Nitro's virtual
-        # module graph (#build/*, auto-imported server globals), so the hub
-        # app is excluded from the step above and checked with Nuxt's own
-        # tool here instead.
-        run: pnpm hub:typecheck
+        run: pnpm typecheck:packages
 
       - name: The hub must not name a specific target
         run: pnpm lint:no-target-coupling
@@ -46,6 +44,36 @@ jobs:
 
       - name: Specifications hold together
         run: pnpm specs:validate
+
+  Apps:
+    # Static checks for apps/* (currently apps/hub, a Nuxt project). Split
+    # out because a Nuxt app needs its own type checker: a standalone one
+    # cannot resolve Nuxt and Nitro's virtual module graph (#build/*,
+    # auto-imported server globals). As more apps are added, extend this
+    # job's steps rather than adding new top-level jobs per app.
+    # Runtime tests for apps/hub are not repeated here: the Test job already
+    # covers them, since apps/hub is registered as a project in the root
+    # vitest config alongside packages/*.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint:apps
+
+      - name: Types
+        # nuxi typecheck, wrapping vue-tsc — the tool built for a Nuxt
+        # project's virtual modules and .vue SFCs, in place of oxlint here.
+        run: pnpm typecheck:apps
 
   Test:
     runs-on: ubuntu-latest
