@@ -11,3 +11,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+
+# Nuxt build output.
+apps/hub/.nuxt/
+apps/hub/.output/

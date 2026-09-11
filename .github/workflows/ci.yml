@@ -31,6 +31,13 @@ jobs:
       - name: Types
         run: pnpm typecheck
 
+      - name: Nuxt app types
+        # A standalone type checker cannot resolve Nuxt and Nitro's virtual
+        # module graph (#build/*, auto-imported server globals), so the hub
+        # app is excluded from the step above and checked with Nuxt's own
+        # tool here instead.
+        run: pnpm hub:typecheck
+
       - name: The hub must not name a specific target
         run: pnpm lint:no-target-coupling
 
