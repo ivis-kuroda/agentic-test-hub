@@ -1,0 +1,19 @@
+id: MX-DISPATCH
+title: credentials against delivery channel
+axes:
+  rows: F-CREDENTIALS
+  cols: F-CHANNEL
+additional: []
+strategy: single_factor
+exclusions:
+  - when:
+      F-CHANNEL: L-SMS
+      F-CREDENTIALS: L-ABSENT
+    reason: credentials are checked before the channel is read, so the channel cannot affect the outcome
+  - when:
+      F-CHANNEL: L-PUSH
+      F-CREDENTIALS: L-ABSENT
+    reason: credentials are checked before the channel is read, so the channel cannot affect the outcome
+viewpoints:
+  - VP-AUTH
+  - VP-CHANNEL

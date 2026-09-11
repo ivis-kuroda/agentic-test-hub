@@ -1,0 +1,17 @@
+id: F-CHANNEL
+name: delivery channel
+description: which channel the request asks the service to deliver over
+path: context.body.channel
+levels:
+  - id: L-EMAIL
+    name: email
+    value: email
+    absent: false
+  - id: L-SMS
+    name: sms
+    value: sms
+    absent: false
+  - id: L-PUSH
+    name: push
+    value: push
+    absent: false

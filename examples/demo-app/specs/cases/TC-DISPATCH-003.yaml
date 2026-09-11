@@ -1,0 +1,19 @@
+id: TC-DISPATCH-003
+summary: the request is accepted over push
+baseline: BL-DISPATCH-STD
+overrides:
+  - path: context.body.channel
+    op: set
+    value: push
+expect:
+  - kind: http_status
+    status: 201
+    viewpoints: []
+polarity: nominal
+evidenceWaivers: []
+priority: P2
+tags: []
+automation:
+  status: manual
+viewpoints:
+  - VP-CHANNEL

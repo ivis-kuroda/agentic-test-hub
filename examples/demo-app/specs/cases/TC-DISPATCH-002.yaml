@@ -1,0 +1,19 @@
+id: TC-DISPATCH-002
+summary: the request is accepted over sms
+baseline: BL-DISPATCH-STD
+overrides:
+  - path: context.body.channel
+    op: set
+    value: sms
+expect:
+  - kind: http_status
+    status: 201
+    viewpoints: []
+polarity: nominal
+evidenceWaivers: []
+priority: P2
+tags: []
+automation:
+  status: manual
+viewpoints:
+  - VP-CHANNEL

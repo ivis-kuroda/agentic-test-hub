@@ -1,0 +1,10 @@
+id: VP-CHANNEL
+title: only supported delivery channels are accepted
+rationale: an unrecognised channel must be refused with a message naming it, rather than accepted and silently dropped at delivery time
+source:
+  - kind: design
+    ref: dispatch service design, section 3
+  - kind: code
+    ref: server.ts:CHANNELS
+risk: medium
+parents: []

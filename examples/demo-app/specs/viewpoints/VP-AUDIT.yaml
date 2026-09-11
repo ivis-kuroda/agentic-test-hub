@@ -1,0 +1,8 @@
+id: VP-AUDIT
+title: every attempt is recorded, accepted or not
+rationale: operators reconstructing an incident need to see refused attempts, which are exactly the ones an attacker makes
+source:
+  - kind: design
+    ref: dispatch service design, section 6
+risk: medium
+parents: []

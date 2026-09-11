@@ -1,0 +1,18 @@
+id: BL-DISPATCH-STD
+title: the standard dispatch request
+target:
+  surface: Dispatch API
+  action: send a notification
+preconditions:
+  - queue.empty
+  - service.reachable
+config: {}
+context:
+  body:
+    channel: email
+    recipient: someone@example.invalid
+  headers:
+    Authorization: Bearer {{env.DEMO_TOKEN}}
+action:
+  operation: OP-SEND
+  params: {}

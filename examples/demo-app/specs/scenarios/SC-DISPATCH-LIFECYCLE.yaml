@@ -1,0 +1,56 @@
+id: SC-DISPATCH-LIFECYCLE
+title: a notification is accepted, listed, then drained
+preconditions:
+  - queue.empty
+steps:
+  - id: S-SEND
+    summary: the service accepts a notification
+    action:
+      operation: OP-SEND
+      params:
+        channel: email
+        recipient: someone@example.invalid
+    expect:
+      - kind: http_status
+        status: 201
+        viewpoints: []
+    polarity: nominal
+    dependsOn: []
+    produces:
+      notificationId: body.notification.id
+    viewpoints: []
+  - id: S-LIST
+    summary: the accepted notification appears in the list
+    action:
+      operation: OP-COUNT
+      params: {}
+    expect:
+      - kind: operation_result
+        operation: OP-COUNT
+        params: {}
+        assert:
+          kind: equals
+          value: 1
+        viewpoints: []
+    polarity: nominal
+    dependsOn:
+      - S-SEND
+    produces: {}
+    viewpoints: []
+  - id: S-DRAIN
+    summary: draining empties the queue
+    action:
+      operation: OP-DRAIN
+      params: {}
+    expect:
+      - kind: stdout_contains
+        value: drained 1 notification
+        viewpoints: []
+    polarity: nominal
+    dependsOn:
+      - S-LIST
+    produces: {}
+    viewpoints: []
+evidenceWaivers: []
+tags: []
+viewpoints: []

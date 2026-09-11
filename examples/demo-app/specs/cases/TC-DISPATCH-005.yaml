@@ -1,0 +1,25 @@
+id: TC-DISPATCH-005
+summary: a request naming an unsupported channel is refused
+baseline: BL-DISPATCH-STD
+overrides:
+  - path: context.body.channel
+    op: set
+    value: carrier-pigeon
+expect:
+  - kind: http_status
+    status: 400
+    viewpoints:
+      - VP-CHANNEL
+  - kind: error_message
+    value: "unsupported channel: carrier-pigeon"
+    match: contains
+    viewpoints:
+      - VP-CHANNEL
+polarity: error
+evidenceWaivers: []
+priority: P1
+tags: []
+automation:
+  status: manual
+viewpoints:
+  - VP-CHANNEL

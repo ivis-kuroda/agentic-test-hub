@@ -1,0 +1,25 @@
+id: TC-DISPATCH-001
+summary: the standard request is accepted over email
+baseline: BL-DISPATCH-STD
+overrides: []
+expect:
+  - kind: http_status
+    status: 201
+    viewpoints: []
+  - kind: operation_result
+    operation: OP-READ-LOGS
+    params: {}
+    assert:
+      kind: contains
+      value: accepted
+    viewpoints:
+      - VP-AUDIT
+polarity: nominal
+evidenceWaivers: []
+priority: P1
+tags:
+  - smoke
+automation:
+  status: manual
+viewpoints:
+  - VP-CHANNEL

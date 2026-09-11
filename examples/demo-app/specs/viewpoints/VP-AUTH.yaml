@@ -1,0 +1,8 @@
+id: VP-AUTH
+title: requests without usable credentials are rejected
+rationale: an unauthenticated caller must not be able to send anything, and a rejection must leave no trace of the attempt behind
+source:
+  - kind: design
+    ref: dispatch service design, section 2
+risk: high
+parents: []

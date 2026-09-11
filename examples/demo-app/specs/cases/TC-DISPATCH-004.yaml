@@ -1,0 +1,28 @@
+id: TC-DISPATCH-004
+summary: a request with no credentials is rejected
+baseline: BL-DISPATCH-STD
+overrides:
+  - path: context.headers.Authorization
+    op: remove
+expect:
+  - kind: http_status
+    status: 401
+    viewpoints:
+      - VP-AUTH
+  - kind: operation_result
+    operation: OP-READ-LOGS
+    params: {}
+    assert:
+      kind: contains
+      value: no usable credentials
+    viewpoints:
+      - VP-AUDIT
+polarity: error
+evidenceWaivers: []
+priority: P1
+tags:
+  - smoke
+automation:
+  status: manual
+viewpoints:
+  - VP-AUTH
