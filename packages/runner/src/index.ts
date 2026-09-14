@@ -18,4 +18,6 @@ export * from "./executor/registry.ts";
 export * from "./executor/shell.ts";
 export * from "./executor/sql.ts";
 export * from "./executor/types.ts";
+export * from "./run-case.ts";
+export * from "./run-scenario.ts";
 export * from "./state.ts";
