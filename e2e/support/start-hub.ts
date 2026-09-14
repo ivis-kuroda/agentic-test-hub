@@ -25,7 +25,7 @@
  * directory being reset between them.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, open, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -66,6 +66,14 @@ export interface RunningHub {
   readonly url: string;
   /** The temporary directory `apps/hub` is reading/writing as its `SPECS_ROOT`. */
   readonly specsRoot: string;
+  /**
+   * Where the server's stdout/stderr is captured.
+   *
+   * apps/hub exposes no log-reading endpoint the way `examples/demo-app`
+   * does, so `e2e/plugin.yaml`'s `app_log` evidence collector reads this file
+   * (via `{{env.HUB_LOG_FILE}}`) instead of an HTTP call.
+   */
+  readonly logFile: string;
   /** Stops the Nuxt process and removes the temporary `SPECS_ROOT`. Idempotent. */
   stop(): Promise<void>;
 }
@@ -164,30 +172,43 @@ export async function startHubApp(options: StartHubOptions = {}): Promise<Runnin
   const specsRoot = await seedSpecsRoot(options.fixtureSpecs ?? DEFAULT_FIXTURE_SPECS);
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
+  const logFile = join(specsRoot, "..", `${specsRoot.split("/").pop()}.log`);
+  const log = await open(logFile, "w");
 
   const child = spawn(process.execPath, [HUB_SERVER_ENTRY], {
     cwd: HUB_ROOT,
     env: { ...process.env, SPECS_ROOT: specsRoot, PORT: String(port), HOST: "127.0.0.1" },
-    stdio: "ignore",
+    stdio: ["ignore", log.fd, log.fd],
     // Its own process group, so stopProcess can kill any child workers the
     // Nitro server starts too, rather than orphaning them.
     detached: true,
   });
+
+  let logClosed = false;
+  const cleanupLog = async (): Promise<void> => {
+    if (logClosed) return;
+    logClosed = true;
+    await log.close();
+    await rm(logFile, { force: true });
+  };
 
   try {
     await waitUntilReady(url, child, options.readyTimeoutMs ?? 60_000);
   } catch (cause) {
     await stopProcess(child);
     await rm(specsRoot, { recursive: true, force: true });
+    await cleanupLog();
     throw cause;
   }
 
   return {
     url,
     specsRoot,
+    logFile,
     stop: async () => {
       await stopProcess(child);
       await rm(specsRoot, { recursive: true, force: true });
+      await cleanupLog();
     },
   };
 }

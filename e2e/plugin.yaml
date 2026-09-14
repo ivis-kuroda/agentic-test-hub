@@ -9,15 +9,20 @@
 # launches a real `apps/hub` instance against a disposable, seeded
 # `SPECS_ROOT` for every test file that uses this manifest.
 #
-# Evidence and policy: apps/hub exposes no log-reading endpoint, so nothing
-# collects app_log, db_log or db_records for any case here — they are marked
-# informational below, same as demo-app marks channels it cannot supply.
-# browser_console and browser_network *are* real, collectible channels, but
-# only for cases that actually open a browser session; a pure-API case has no
-# session and can never supply them. Rather than leave those cases
-# permanently inconclusive, each pure-API case is expected to waive
-# browser_console/browser_network in its own spec (with a reason), which
-# `nonWaivable` below permits.
+# Evidence and policy: apps/hub exposes no log-reading endpoint the way
+# examples/demo-app does, so app_log is instead read from the file
+# e2e/support/start-hub.ts captures the server's own stdout/stderr into (its
+# path is passed as HUB_LOG_FILE). That channel is available for every case
+# regardless of whether it opens a browser, which matters: a policy that
+# binds nothing but browser_console/browser_network would leave every
+# pure-API case permanently inconclusive (evaluateVerdict never reports
+# "pass" on zero decided channels — see packages/core/src/derive/verdict.ts),
+# since such a case has no browser session to collect either from. app_log is
+# therefore the one channel bound for every case; browser_console/network are
+# additionally bound for cases that do open a session, and each pure-API case
+# is expected to waive both (with a reason), which `nonWaivable` below
+# permits. db_records/db_log stay informational: nothing here reads a
+# database.
 apiVersion: "1"
 name: hub-self-test
 description: the hub's own product, apps/hub, tested by the hub's own pipeline
@@ -57,22 +62,39 @@ operations:
     body:
       entity: "{{param.entity}}"
 
+  # expectedHash comes from `{{step.expectedHash}}`, not a param: a scenario
+  # step's own `action.params` are placed into the `param` scope unrendered
+  # (see packages/runner/src/executor/registry.ts), so a value only known at
+  # run time — the hash a prior step's response reported — has no way to
+  # reach an operation through `param`. `step` is populated before an
+  # operation's own template is rendered, so reading it there is the only
+  # mechanical path a stale-hash conflict test (or any update/delete
+  # following a create in the same scenario) has. This is why these two
+  # operations can only be used inside a scenario, never as a standalone
+  # case's action.
   OP-UPDATE-ENTITY:
     executor: http
     connection: api
     method: PUT
     path: "/api/specs/{{param.kind}}"
-    params: [kind, entity, expectedHash]
+    params: [kind, entity]
     body:
       entity: "{{param.entity}}"
-      expectedHash: "{{param.expectedHash}}"
+      expectedHash: "{{step.expectedHash}}"
 
   OP-DELETE-ENTITY:
     executor: http
     connection: api
     method: DELETE
-    path: "/api/specs/{{param.kind}}/{{param.id}}?expectedHash={{param.expectedHash}}"
-    params: [kind, id, expectedHash]
+    path: "/api/specs/{{param.kind}}/{{param.id}}?expectedHash={{step.expectedHash}}"
+    params: [kind, id]
+
+  # Reads the server's own captured stdout/stderr — see the evidence comment
+  # below. Linux-only (`cat`), like the rest of this sandbox's tooling.
+  OP-READ-SERVER-LOG:
+    executor: shell
+    run: ["cat", "{{env.HUB_LOG_FILE}}"]
+    timeoutMs: 5000
 
   OP-OPEN-CASE-EDITOR:
     executor: browser
@@ -102,33 +124,50 @@ states:
       assert: { kind: contains, value: '"suite"' }
     cost: low
 
-evidence: {}
+evidence:
+  app_log:
+    operation: OP-READ-SERVER-LOG
 
-# See the header comment: nothing collects app_log/db_log/db_records for any
-# case, so all three are informational. screenshot is informational too,
-# same as demo-app (a screenshot is never proof by itself — see
-# `insufficientAlone` — and this target has no case that judges by
-# appearance yet). browser_console and browser_network are real, bound
-# channels for cases that open a browser session; `nonWaivable` is narrowed
-# from the default so a pure-API case can waive both with a stated reason
-# instead of sitting inconclusive forever for evidence it structurally
-# cannot produce.
+# See the header comment for why app_log is the one channel bound for every
+# case. Its condition is `clean` under *both* polarities, not the usual
+# `clean`/`expected_error` split: apps/hub's server only ever writes to this
+# log on startup and on a genuine crash — deliberate 4xx rejections
+# (checked directly via http_status/error_message expectations instead)
+# never produce a line here (confirmed by actually triggering a 409 and a
+# 404 against a real instance and reading the log after) — so treating
+# silence as a violation for an error-polarity case would be judging this
+# target on a signal it does not produce, not on whether the rejection
+# actually happened.
+#
+# `browser_console`/`browser_network` stay informational rather than bound:
+# they exist only while a browser session is open, and a session opened by
+# `BrowserExecutor` for one operation is closed again before the next one
+# runs unless the caller explicitly borrows and reuses it — which is not
+# something today's generated test code does (see
+# `packages/cli/src/template-typescript.ts`, which registers a plain
+# `new BrowserExecutor(new PlaywrightDriver())` with no borrowed session).
+# Binding them here would leave every browser-driven case in this suite
+# permanently inconclusive for a gap in code generation, not in apps/hub
+# itself; confirmed by actually running a browser-driven scenario and
+# finding both channels reported missing despite two browser operations
+# genuinely running. Revisit once code generation threads a session through.
+# `screenshot`/`db_records`/`db_log` stay informational for the same reason
+# as demo-app/no database: nothing here collects them at all.
 policy:
   id: hub-self-test
-  title: browser-driven hub cases judged on console and network; API-only cases waive both
+  title: judged on the server's own log
   rules:
     nominal:
       screenshot: informational
-      browser_console: clean
-      browser_network: success_response
+      browser_console: informational
+      browser_network: informational
       db_records: informational
-      app_log: informational
+      app_log: clean
       db_log: informational
     error:
       screenshot: informational
       browser_console: informational
-      browser_network: error_response
+      browser_network: informational
       db_records: informational
-      app_log: informational
+      app_log: clean
       db_log: informational
-  nonWaivable: []
