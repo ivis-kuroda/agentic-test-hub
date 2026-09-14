@@ -104,7 +104,16 @@ ${dataDecl}
 test(${JSON.stringify(`${plan.id}: ${title}`)}, async () => {
   const registry = new ExecutorRegistry();
 ${registrations(kinds)}
-  const context: ExecutionContext = { manifest, scopes: {}, root: dirname(manifestPath) };
+  // A manifest's connections/operations commonly interpolate {{env.X}} (a
+  // target URL, a token) — the operator supplies those as real environment
+  // variables when running the generated test, the same convention the
+  // manifest itself uses, so scopes.env defaults to process.env rather than
+  // being left empty.
+  const context: ExecutionContext = {
+    manifest,
+    scopes: { env: process.env },
+    root: dirname(manifestPath),
+  };
 ${body}
 });
 `;

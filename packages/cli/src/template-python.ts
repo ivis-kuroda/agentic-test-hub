@@ -127,6 +127,7 @@ Assertions and setup around the generated call are yours to extend.
 """
 
 import json
+import os
 from pathlib import Path
 
 from agentic_test_hub_runner import (
@@ -142,7 +143,13 @@ ${dataDecl}
 def ${functionName}() -> None:
     registry = ExecutorRegistry()
 ${registrations(kinds)}
-    context = ExecutionContext(manifest=MANIFEST, scopes={}, root=str(MANIFEST_PATH.parent))
+    # A manifest's connections/operations commonly interpolate {{env.X}} (a
+    # target URL, a token) — the operator supplies those as real environment
+    # variables when running the generated test, so scopes["env"] defaults
+    # to os.environ rather than being left empty.
+    context = ExecutionContext(
+        manifest=MANIFEST, scopes={"env": dict(os.environ)}, root=str(MANIFEST_PATH.parent)
+    )
     result = ${call}
     assert result.verdict == "pass", result
 `;
