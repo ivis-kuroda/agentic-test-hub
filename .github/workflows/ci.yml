@@ -108,6 +108,43 @@ jobs:
       - name: Unit and integration tests
         run: pnpm test
 
+  Python:
+    # python/agentic-test-hub-runner: the Python half of generated-test
+    # execution (packages/cli's `--lang python`). It mirrors
+    # packages/runner's runtime half only — never manifest schema
+    # validation or override resolution, which stay TypeScript-only — but
+    # judges a run by the same evidence/verdict framework, so it gets its
+    # own toolchain (uv/ruff/ty/pytest) rather than folding into the
+    # Node-based jobs above.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python/agentic-test-hub-runner
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: python/agentic-test-hub-runner/uv.lock
+
+      # uv reads .python-version and provisions that exact interpreter
+      # itself, so there is nothing to assert separately here the way the
+      # Node jobs above have to (a runner falling back to an older major).
+      - run: uv sync --locked
+
+      - name: Formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Types
+        run: uv run ty check
+
+      - name: Unit tests
+        run: uv run pytest
+
   E2E:
     runs-on: ubuntu-latest
     steps:
