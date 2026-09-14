@@ -54,8 +54,15 @@ export function subjectOf(result: ExecutionResult): { value: unknown; from: stri
   return { value: (result.stdout ?? "").trim(), from: "standard output" };
 }
 
-/** Text an assertion can search, whatever the operation produced. */
-function textOf(result: ExecutionResult): string {
+/**
+ * Text an assertion can search, whatever the operation produced.
+ *
+ * Exported for {@link checkExpectation} (see `expectation.ts`), which needs
+ * the same body/rows/stdout flattening for its `text`/`error_message` kinds
+ * — a second implementation of "what counts as searchable text" would drift
+ * from this one.
+ */
+export function textOf(result: ExecutionResult): string {
   const parts = [result.stdout ?? "", result.stderr ?? ""];
   if (result.rows !== undefined) parts.push(JSON.stringify(result.rows));
   else if (result.body !== undefined) parts.push(JSON.stringify(result.body));

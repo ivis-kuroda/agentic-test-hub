@@ -9,6 +9,7 @@
  */
 export * from "./assert.ts";
 export * from "./evidence.ts";
+export * from "./expectation.ts";
 export * from "./driver/playwright.ts";
 export * from "./executor/browser.ts";
 export * from "./executor/http.ts";
