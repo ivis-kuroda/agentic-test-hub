@@ -27,6 +27,8 @@ export class TemplateError extends Error {
 }
 
 const PLACEHOLDER = /\{\{\s*([a-z]+)\.([A-Za-z0-9_.-]+)\s*\}\}/g;
+/** Matches a string that, once trimmed, is nothing but one placeholder. */
+const WHOLE_PLACEHOLDER = /^\{\{\s*([a-z]+)\.([A-Za-z0-9_.-]+)\s*\}\}$/;
 const SCOPES = ["env", "param", "step"] as const;
 
 function lookup(scopes: TemplateScopes, scope: string, path: string): unknown {
@@ -39,6 +41,34 @@ function lookup(scopes: TemplateScopes, scope: string, path: string): unknown {
     current = (current as Record<string, unknown>)[segment];
   }
   return current;
+}
+
+/**
+ * Resolves one placeholder to its raw value, unresolved and uncoerced.
+ *
+ * Shared by `render()`, which coerces the result to a string (or rejects a
+ * non-scalar), and `renderDeep()`'s whole-placeholder passthrough, which does
+ * not.
+ *
+ * @throws {TemplateError} When the scope is unknown or the value is absent.
+ */
+function resolvePlaceholder(
+  scope: string,
+  path: string,
+  scopes: TemplateScopes,
+  placeholder: string,
+): unknown {
+  if (!(SCOPES as readonly string[]).includes(scope)) {
+    throw new TemplateError(
+      `unknown scope "${scope}" in {{${placeholder}}}; expected one of ${SCOPES.join(", ")}`,
+      placeholder,
+    );
+  }
+  const value = lookup(scopes, scope, path);
+  if (value === undefined || value === null) {
+    throw new TemplateError(`{{${placeholder}}} did not resolve to a value`, placeholder);
+  }
+  return value;
 }
 
 /**
@@ -60,16 +90,7 @@ function lookup(scopes: TemplateScopes, scope: string, path: string): unknown {
 export function render(input: string, scopes: TemplateScopes): string {
   return input.replace(PLACEHOLDER, (whole, scope: string, path: string) => {
     const placeholder = whole.slice(2, -2).trim();
-    if (!(SCOPES as readonly string[]).includes(scope)) {
-      throw new TemplateError(
-        `unknown scope "${scope}" in {{${placeholder}}}; expected one of ${SCOPES.join(", ")}`,
-        placeholder,
-      );
-    }
-    const value = lookup(scopes, scope, path);
-    if (value === undefined || value === null) {
-      throw new TemplateError(`{{${placeholder}}} did not resolve to a value`, placeholder);
-    }
+    const value = resolvePlaceholder(scope, path, scopes, placeholder);
     if (typeof value === "string") return value;
     if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
       return String(value);
@@ -84,13 +105,32 @@ export function render(input: string, scopes: TemplateScopes): string {
 /**
  * Renders every string inside a structure, leaving other values alone.
  *
+ * A leaf that, once trimmed, is nothing but a single placeholder (e.g. a
+ * `body:` field set to `"{{param.entity}}"`) resolves to that placeholder's
+ * raw value when it is an object or array, rather than going through
+ * `render()` and being rejected — `render()` itself is unchanged, since text
+ * genuinely cannot contain a structured value. Any other placeholder,
+ * including one whose value is a scalar, still renders as text exactly as
+ * before.
+ *
  * @param input - Structure to render.
  * @param scopes - Values available for substitution.
  * @returns A new structure with all strings rendered.
  * @throws {TemplateError} When any placeholder cannot be resolved.
  */
 export function renderDeep<T>(input: T, scopes: TemplateScopes): T {
-  if (typeof input === "string") return render(input, scopes) as T;
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    const whole = trimmed.match(WHOLE_PLACEHOLDER);
+    if (whole !== null) {
+      // Both groups are mandatory in WHOLE_PLACEHOLDER, so a match always has them.
+      const [, scope, path] = whole as [string, string, string];
+      const placeholder = trimmed.slice(2, -2).trim();
+      const value = resolvePlaceholder(scope, path, scopes, placeholder);
+      if (typeof value === "object") return value as T;
+    }
+    return render(input, scopes) as T;
+  }
   if (Array.isArray(input)) {
     return input.map((item) => renderDeep(item, scopes)) as T;
   }

@@ -74,6 +74,37 @@ describe("renderDeep", () => {
   it("leaves non-string leaves untouched", () => {
     expect(renderDeep({ n: 1, b: false, z: null }, scopes)).toEqual({ n: 1, b: false, z: null });
   });
+
+  it("passes a whole-placeholder leaf's object value through raw", () => {
+    expect(renderDeep({ entity: "{{param.nested}}" }, scopes)).toEqual({
+      entity: { id: 42 },
+    });
+  });
+
+  it("passes a whole-placeholder leaf's array value through raw", () => {
+    const withArray = { param: { ...scopes.param, tags: ["a", "b"] } };
+    expect(renderDeep({ tags: "{{param.tags}}" }, withArray)).toEqual({ tags: ["a", "b"] });
+  });
+
+  it("mixes raw passthrough with ordinary text substitution in the same structure", () => {
+    expect(renderDeep({ entity: "{{param.nested}}", label: "for {{param.user}}" }, scopes)).toEqual(
+      { entity: { id: 42 }, label: "for ada" },
+    );
+  });
+
+  it("still renders a whole-placeholder leaf as text when its value is a scalar", () => {
+    expect(renderDeep({ user: "{{param.user}}" }, scopes)).toEqual({ user: "ada" });
+  });
+
+  it("tolerates surrounding whitespace around a whole placeholder", () => {
+    expect(renderDeep({ entity: "  {{ param.nested }}  " }, scopes)).toEqual({
+      entity: { id: 42 },
+    });
+  });
+
+  it("still throws for an unresolved whole placeholder", () => {
+    expect(() => renderDeep({ entity: "{{param.missing}}" }, scopes)).toThrow(TemplateError);
+  });
 });
 
 describe("collectPlaceholders", () => {
