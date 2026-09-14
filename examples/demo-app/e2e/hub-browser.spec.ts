@@ -24,7 +24,7 @@ import {
   type ExecutionContext,
 } from "@agentic-test-hub/runner";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = new URL("../../..", import.meta.url).pathname;
 const TOKEN = "e2e-token";
 
 let demo: RunningDemo;
