@@ -84,18 +84,6 @@ export const Operation = z.discriminatedUnion("executor", [
     body: z.unknown().optional(),
     /** Body read from a file, for payloads too large to inline. */
     bodyFile: z.string().min(1).optional(),
-    /**
-     * Uses this param's value directly as the JSON body, unrendered.
-     *
-     * `body`'s `{{scope.path}}` placeholders only ever substitute into text
-     * (see `template.ts`'s `render`, which rejects a non-scalar value with
-     * "cannot be substituted into text") — there is deliberately no way to
-     * splice a whole structured object into a body position that way. An
-     * operation whose body genuinely is an arbitrary structured value
-     * supplied by the caller (saving an entity of unknown shape to a
-     * generic endpoint, say) names the param here instead.
-     */
-    bodyParam: z.string().min(1).optional(),
     timeoutMs: z.number().int().positive().default(60_000),
   }),
 

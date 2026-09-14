@@ -74,14 +74,6 @@ export class HttpExecutor implements Executor<"http"> {
     let payload: string | undefined;
     if (operation.bodyFile !== undefined) {
       payload = await readFile(resolvePath(context.root, operation.bodyFile), "utf8");
-    } else if (operation.bodyParam !== undefined) {
-      if (!Object.hasOwn(context.scopes.param ?? {}, operation.bodyParam)) {
-        throw new ExecutorError(
-          `operation needs param "${operation.bodyParam}" for its body`,
-          operation.connection,
-        );
-      }
-      payload = JSON.stringify(context.scopes.param?.[operation.bodyParam]);
     } else if (rendered.body !== undefined) {
       payload = typeof rendered.body === "string" ? rendered.body : JSON.stringify(rendered.body);
     }

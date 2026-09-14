@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import httpx
 import pytest
 
@@ -65,49 +63,6 @@ def test_a_rejection_is_a_completed_operation_not_a_failure() -> None:
     assert result.ok is True
     assert result.status == 400
     assert result.body == {"error": "recipient is required"}
-
-
-def test_body_param_sends_the_params_value_as_the_whole_body_unrendered() -> None:
-    entity = {"id": "TC-1", "summary": "contains a {{literal}} that must not be templated"}
-    seen: dict[str, bytes] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen["body"] = request.content
-        return httpx.Response(200, json={"ok": True})
-
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    executor = HttpExecutor(client)
-    operation = {
-        "executor": "http",
-        "connection": "api",
-        "method": "PUT",
-        "path": "/notifications/{{param.id}}",
-        "params": ["id", "entity"],
-        "bodyParam": "entity",
-        "headers": {},
-    }
-    context = ExecutionContext(
-        manifest=MANIFEST, scopes={"param": {"id": "TC-1", "entity": entity}}, root="/plugin"
-    )
-    result = executor.run(operation, context)
-    assert result.ok is True
-    assert json.loads(seen["body"]) == entity
-
-
-def test_body_param_raises_when_the_param_is_missing() -> None:
-    executor = HttpExecutor(httpx.Client())
-    operation = {
-        "executor": "http",
-        "connection": "api",
-        "method": "PUT",
-        "path": "/notifications/{{param.id}}",
-        "params": ["id"],
-        "bodyParam": "entity",
-        "headers": {},
-    }
-    context = ExecutionContext(manifest=MANIFEST, scopes={"param": {"id": "TC-1"}}, root="/plugin")
-    with pytest.raises(ExecutorError, match='needs param "entity"'):
-        executor.run(operation, context)
 
 
 def test_raises_for_a_non_http_connection() -> None:

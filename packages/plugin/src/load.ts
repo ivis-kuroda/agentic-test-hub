@@ -64,18 +64,8 @@ export function checkIntegrity(manifest: PluginManifest): IntegrityProblem[] {
       }
     }
 
-    if (operation.executor === "http") {
-      const bodySources = [
-        operation.body !== undefined,
-        Boolean(operation.bodyFile),
-        Boolean(operation.bodyParam),
-      ].filter(Boolean).length;
-      if (bodySources > 1) {
-        problems.push({
-          at,
-          message: "declares more than one of body, bodyFile, bodyParam; use one",
-        });
-      }
+    if (operation.executor === "http" && operation.body !== undefined && operation.bodyFile) {
+      problems.push({ at, message: "declares both body and bodyFile; use one" });
     }
 
     if (operation.executor === "extension" && !manifest.extensionModule) {

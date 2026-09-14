@@ -48,22 +48,6 @@ operations:
     path: /notifications/{{param.id}}
     params: [id]
 
-  OP-SAVE:
-    executor: http
-    connection: api
-    method: PUT
-    path: /notifications/{{param.id}}
-    params: [id, entity]
-    bodyParam: entity
-
-  OP-SAVE-UNGUARDED:
-    executor: http
-    connection: api
-    method: PUT
-    path: /notifications/{{param.id}}
-    params: [id]
-    bodyParam: entity
-
   OP-COUNT-QUEUED:
     executor: sql
     connection: primary-db

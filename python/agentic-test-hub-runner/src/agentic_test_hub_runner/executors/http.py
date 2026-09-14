@@ -45,20 +45,8 @@ class HttpExecutor:
 
         payload: str | None = None
         body_file = operation.get("bodyFile")
-        body_param = operation.get("bodyParam")
         if body_file is not None:
             payload = (Path(context.root) / body_file).read_text("utf8")
-        elif body_param is not None:
-            # Uses the param's value directly, unrendered - render_deep only
-            # ever substitutes into text (see template.py's render), which
-            # cannot express splicing a whole structured value into a body
-            # position. Mirrors packages/runner/src/executor/http.ts.
-            params = context.scopes.get("param") or {}
-            if body_param not in params:
-                raise ExecutorError(
-                    f'operation needs param "{body_param}" for its body', operation["connection"]
-                )
-            payload = json.dumps(params[body_param])
         elif rendered["body"] is not None:
             body = rendered["body"]
             payload = body if isinstance(body, str) else json.dumps(body)
