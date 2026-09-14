@@ -150,6 +150,23 @@ describe("HttpExecutor", () => {
     const result = await registry.run("OP-SEND", { channel: "email" }, contextFor());
     expect(result.body).toBeUndefined();
   });
+
+  it("sends a bodyParam's value as the whole body, unrendered", async () => {
+    const fetchFn = recordingFetch();
+    const registry = registryWith(new HttpExecutor(fetchFn));
+    const entity = { id: "TC-1", summary: "contains a {{literal}} that must not be templated" };
+    await registry.run("OP-SAVE", { id: "TC-1", entity }, contextFor());
+    const body = fetchFn.calls[0]?.init.body;
+    expect(typeof body).toBe("string");
+    expect(JSON.parse(body as string)).toEqual(entity);
+  });
+
+  it("raises a clear error when bodyParam names a param the operation never declared", async () => {
+    const registry = registryWith(new HttpExecutor(recordingFetch()));
+    await expect(registry.run("OP-SAVE-UNGUARDED", { id: "TC-1" }, contextFor())).rejects.toThrow(
+      /needs param "entity"/,
+    );
+  });
 });
 
 describe("SqlExecutor", () => {

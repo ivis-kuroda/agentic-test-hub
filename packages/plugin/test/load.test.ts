@@ -132,7 +132,19 @@ describe("checkIntegrity", () => {
       const operations = draft["operations"] as unknown as Record<string, { bodyFile?: string }>;
       operations["OP-DISPATCH-SEND"]!.bodyFile = "payload.json";
     });
-    expect(checkIntegrity(broken)[0]?.message).toMatch(/both body and bodyFile/);
+    expect(checkIntegrity(broken)[0]?.message).toMatch(
+      /more than one of body, bodyFile, bodyParam/,
+    );
+  });
+
+  it("catches an http operation declaring body and bodyParam together", () => {
+    const broken = mutated((draft) => {
+      const operations = draft["operations"] as unknown as Record<string, { bodyParam?: string }>;
+      operations["OP-DISPATCH-SEND"]!.bodyParam = "entity";
+    });
+    expect(checkIntegrity(broken)[0]?.message).toMatch(
+      /more than one of body, bodyFile, bodyParam/,
+    );
   });
 
   it("catches an extension operation with no module to load it from", () => {
