@@ -8,6 +8,7 @@
  * change here.
  */
 export * from "./assert.ts";
+export * from "./derive-params.ts";
 export * from "./evidence.ts";
 export * from "./expectation.ts";
 export * from "./driver/playwright.ts";
