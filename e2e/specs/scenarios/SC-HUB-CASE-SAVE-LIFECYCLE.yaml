@@ -1,0 +1,218 @@
+id: SC-HUB-CASE-SAVE-LIFECYCLE
+title: a case is created, updated, protected from a stale-hash conflict, then deleted
+preconditions:
+  - suite.reachable
+steps:
+  - id: S-CREATE
+    summary: creating the entity succeeds and reports a hash
+    action:
+      operation: OP-CREATE-ENTITY
+      params:
+        entity:
+          id: TC-HUB-LIFECYCLE-001
+          summary: before any edit
+          baseline: BL-HUB-PROBE
+          expect:
+            - kind: http_status
+              status: 200
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn: []
+    produces:
+      expectedHash: body.hash
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-GET-AFTER-CREATE
+    summary: reading it back shows exactly what was saved
+    action:
+      operation: OP-GET-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: operation_result
+        operation: OP-GET-ENTITY
+        params:
+          id: TC-HUB-LIFECYCLE-001
+          kind: case
+        assert:
+          kind: contains
+          value: before any edit
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn:
+      - S-CREATE
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-UPDATE
+    summary: updating with the current hash succeeds, changing the stored content
+    action:
+      operation: OP-UPDATE-ENTITY
+      params:
+        entity:
+          id: TC-HUB-LIFECYCLE-001
+          summary: after the first edit
+          baseline: BL-HUB-PROBE
+          expect:
+            - kind: http_status
+              status: 200
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn:
+      - S-GET-AFTER-CREATE
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-CONFLICTING-UPDATE
+    summary: updating again with the hash from before S-UPDATE (now stale, since S-UPDATE already changed the file) is refused, not silently applied
+    action:
+      operation: OP-UPDATE-ENTITY
+      params:
+        entity:
+          id: TC-HUB-LIFECYCLE-001
+          summary: should never be stored
+          baseline: BL-HUB-PROBE
+          expect:
+            - kind: http_status
+              status: 200
+        kind: case
+    expect:
+      - kind: http_status
+        status: 409
+        viewpoints:
+          - VP-HUB-SAVE-CONFLICT
+      - kind: error_message
+        value: changed since it was read
+        match: contains
+        viewpoints:
+          - VP-HUB-SAVE-CONFLICT
+    polarity: error
+    dependsOn:
+      - S-UPDATE
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-CONFLICT
+  - id: S-CONFIRM-NOT-OVERWRITTEN
+    summary: the refused update did not change the stored content
+    action:
+      operation: OP-GET-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: operation_result
+        operation: OP-GET-ENTITY
+        params:
+          id: TC-HUB-LIFECYCLE-001
+          kind: case
+        assert:
+          kind: contains
+          value: after the first edit
+        viewpoints:
+          - VP-HUB-SAVE-CONFLICT
+    polarity: nominal
+    dependsOn:
+      - S-CONFLICTING-UPDATE
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-CONFLICT
+  - id: S-CONFLICTING-DELETE
+    summary: deleting with a stale hash is refused the same way an update is
+    action:
+      operation: OP-DELETE-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: http_status
+        status: 409
+        viewpoints:
+          - VP-HUB-SAVE-CONFLICT
+    polarity: error
+    dependsOn:
+      - S-CONFIRM-NOT-OVERWRITTEN
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-CONFLICT
+  - id: S-REFRESH-HASH
+    summary: reading the current hash back, now that the stale one has served its purpose
+    action:
+      operation: OP-GET-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn:
+      - S-CONFLICTING-DELETE
+    produces:
+      expectedHash: body.hash
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-DELETE
+    summary: deleting with the current hash succeeds
+    action:
+      operation: OP-DELETE-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn:
+      - S-REFRESH-HASH
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-CONFIRM-GONE
+    summary: the entity no longer exists
+    action:
+      operation: OP-GET-ENTITY
+      params:
+        id: TC-HUB-LIFECYCLE-001
+        kind: case
+    expect:
+      - kind: http_status
+        status: 404
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: error
+    dependsOn:
+      - S-DELETE
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+evidence:
+  sources:
+    - screenshot
+    - browser_console
+    - browser_network
+    - db_records
+    - app_log
+    - db_log
+  timing: after
+  trace: on_failure
+  ignore: []
+evidenceWaivers: []
+tags:
+  - smoke
+viewpoints: []

@@ -1,0 +1,12 @@
+id: VP-HUB-SAVE-CONFLICT
+title: an update or delete against a stale hash is refused, never silently overwritten or removed
+rationale: two editors can open the same entity; without an optimistic-lock check, the second save silently discards the first person's change. The hash check exists precisely so that never happens without at least one of them being told
+source:
+  - kind: code
+    ref: apps/hub/server/api/specs/[kind]/index.put.ts
+  - kind: code
+    ref: apps/hub/server/api/specs/[kind]/[id].delete.ts
+  - kind: code
+    ref: packages/store/src/load.ts:hashContents
+risk: high
+parents: []

@@ -1,0 +1,13 @@
+id: VP-HUB-CASE-EDIT
+title: editing a case through the real case editor page persists the change to its file
+rationale: the editor page is the only way most people ever touch a spec file; if a field's v-model is wired to the wrong path, or the save button's handler stops reaching the API, the page still looks correct and nothing but actually saving and re-reading would catch it
+source:
+  - kind: code
+    ref: apps/hub/app/pages/cases/[id].vue
+  - kind: code
+    ref: apps/hub/app/components/CaseEditor.vue
+  - kind: code
+    ref: apps/hub/app/composables/useEntityEditor.ts
+risk: medium
+parents:
+  - VP-HUB-SAVE-VALID

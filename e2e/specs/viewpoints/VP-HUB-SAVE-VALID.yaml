@@ -1,0 +1,10 @@
+id: VP-HUB-SAVE-VALID
+title: a valid entity is accepted and stored as the file the hub later serves back
+rationale: the whole point of the hub's editor pages is that what a person saves is what they get back; a save that appears to succeed but stores something else, or nothing, undermines every other page built on the store
+source:
+  - kind: code
+    ref: apps/hub/server/api/specs/[kind]/index.put.ts
+  - kind: code
+    ref: apps/hub/server/api/specs/[kind]/[id].get.ts
+risk: high
+parents: []

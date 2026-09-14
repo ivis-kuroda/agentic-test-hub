@@ -1,0 +1,123 @@
+id: SC-HUB-CASE-EDIT-LIFECYCLE
+title: editing a case's summary through the real case editor page persists to its file
+preconditions:
+  - suite.reachable
+steps:
+  - id: S-CREATE
+    summary: a case exists to edit
+    action:
+      operation: OP-CREATE-ENTITY
+      params:
+        entity:
+          id: TC-HUB-EDIT-001
+          summary: before the browser edit
+          baseline: BL-HUB-PROBE
+          expect:
+            - kind: http_status
+              status: 200
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn: []
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+  - id: S-OPEN
+    summary: the case editor page opens and shows the summary field
+    action:
+      operation: OP-OPEN-CASE-EDITOR
+      params:
+        id: TC-HUB-EDIT-001
+    expect:
+      - kind: text
+        value: TC-HUB-EDIT-001
+        match: contains
+        viewpoints:
+          - VP-HUB-CASE-EDIT
+    polarity: nominal
+    dependsOn:
+      - S-CREATE
+    produces: {}
+    viewpoints:
+      - VP-HUB-CASE-EDIT
+  - id: S-EDIT-AND-SAVE
+    summary: changing the summary and clicking Save completes without error
+    action:
+      operation: OP-EDIT-CASE-SUMMARY
+      params:
+        id: TC-HUB-EDIT-001
+        summary: after the browser edit
+    expect:
+      - kind: text
+        value: TC-HUB-EDIT-001
+        match: contains
+        viewpoints:
+          - VP-HUB-CASE-EDIT
+    polarity: nominal
+    dependsOn:
+      - S-OPEN
+    produces: {}
+    viewpoints:
+      - VP-HUB-CASE-EDIT
+  - id: S-CONFIRM-PERSISTED
+    summary: the file on disk now holds the edited summary, not the original
+    action:
+      operation: OP-GET-ENTITY
+      params:
+        id: TC-HUB-EDIT-001
+        kind: case
+    expect:
+      - kind: operation_result
+        operation: OP-GET-ENTITY
+        params:
+          id: TC-HUB-EDIT-001
+          kind: case
+        assert:
+          kind: contains
+          value: after the browser edit
+        viewpoints:
+          - VP-HUB-CASE-EDIT
+    polarity: nominal
+    dependsOn:
+      - S-EDIT-AND-SAVE
+    produces:
+      expectedHash: body.hash
+    viewpoints:
+      - VP-HUB-CASE-EDIT
+  - id: S-CLEANUP
+    summary: the case is removed, leaving no trace for later runs
+    action:
+      operation: OP-DELETE-ENTITY
+      params:
+        id: TC-HUB-EDIT-001
+        kind: case
+    expect:
+      - kind: http_status
+        status: 200
+        viewpoints:
+          - VP-HUB-SAVE-VALID
+    polarity: nominal
+    dependsOn:
+      - S-CONFIRM-PERSISTED
+    produces: {}
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+evidence:
+  sources:
+    - screenshot
+    - browser_console
+    - browser_network
+    - db_records
+    - app_log
+    - db_log
+  timing: after
+  trace: on_failure
+  ignore: []
+evidenceWaivers: []
+tags:
+  - smoke
+viewpoints: []

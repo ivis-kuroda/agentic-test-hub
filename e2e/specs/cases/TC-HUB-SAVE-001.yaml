@@ -1,0 +1,18 @@
+id: TC-HUB-SAVE-001
+summary: creating a new case entity with valid content succeeds
+baseline: BL-HUB-CASE-CREATE
+overrides: []
+expect:
+  - kind: http_status
+    status: 200
+    viewpoints:
+      - VP-HUB-SAVE-VALID
+polarity: nominal
+evidenceWaivers: []
+priority: P1
+tags:
+  - smoke
+automation:
+  status: manual
+viewpoints:
+  - VP-HUB-SAVE-VALID

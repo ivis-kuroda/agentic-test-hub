@@ -1,0 +1,20 @@
+id: BL-HUB-CASE-CREATE
+title: creating a new, valid case entity
+target:
+  surface: Specs API
+  action: create a case entity
+preconditions:
+  - suite.reachable
+config: {}
+context:
+  entity:
+    id: TC-HUB-PROBE-001
+    summary: a probe entity created by the hub's own self-test
+    baseline: BL-HUB-PROBE
+    expect:
+      - kind: http_status
+        status: 200
+  kind: case
+action:
+  operation: OP-CREATE-ENTITY
+  params: {}
