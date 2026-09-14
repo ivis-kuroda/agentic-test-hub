@@ -1,0 +1,18 @@
+{
+  "name": "@agentic-test-hub/cli",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "ath-generate-test": "./bin/generate-test.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agentic-test-hub/core": "workspace:*",
+    "@agentic-test-hub/plugin": "workspace:*",
+    "@agentic-test-hub/runner": "workspace:*",
+    "@agentic-test-hub/store": "workspace:*"
+  }
+}

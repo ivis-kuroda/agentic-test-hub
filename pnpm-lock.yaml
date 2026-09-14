@@ -191,6 +191,21 @@ importers:
 
   examples/demo-app: {}
 
+  packages/cli:
+    dependencies:
+      '@agentic-test-hub/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-test-hub/plugin':
+        specifier: workspace:*
+        version: link:../plugin
+      '@agentic-test-hub/runner':
+        specifier: workspace:*
+        version: link:../runner
+      '@agentic-test-hub/store':
+        specifier: workspace:*
+        version: link:../store
+
   packages/core:
     dependencies:
       zod:
