@@ -104,6 +104,7 @@ export function renderSpecFilePy(
     ...kinds
       .map((kind) => EXECUTOR_IMPORTS[kind])
       .filter((name): name is string => name !== undefined),
+    ...(kinds.includes("browser") ? ["PlaywrightDriver"] : []),
     "load_manifest",
     plan.kind === "case" ? "run_case" : "run_scenario",
   ];

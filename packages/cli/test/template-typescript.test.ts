@@ -14,6 +14,9 @@ connections:
   api:
     kind: http
     baseUrl: "https://api.invalid/v1"
+  ui:
+    kind: browser
+    baseUrl: "{{env.APP_URL}}"
 
 operations:
   OP-SEND:
@@ -24,6 +27,12 @@ operations:
     params: [channel]
     body:
       channel: "{{param.channel}}"
+
+  OP-OPEN:
+    executor: browser
+    connection: ui
+    steps:
+      - { action: goto, url: "{{env.APP_URL}}/" }
 `;
 
 const manifest: PluginManifest = loadManifest(manifestSource).manifest;
@@ -118,5 +127,51 @@ describe("renderSpecFileTs", () => {
     expect(rendered).toContain("runScenario(scenario, registry, context)");
     expect(rendered).toContain("HttpExecutor");
     expect(rendered).not.toContain("BrowserExecutor");
+  });
+
+  it("imports PlaywrightDriver alongside BrowserExecutor when a case needs a browser", () => {
+    const browserBaseline = Baseline.parse({
+      id: "BL-BROWSE",
+      title: "opening the app",
+      preconditions: [],
+      config: {},
+      context: {},
+      action: { operation: "OP-OPEN", params: {} },
+    });
+    const browserCase = TestCase.parse({
+      id: "TC-BROWSE",
+      summary: "opens the app",
+      baseline: "BL-BROWSE",
+      overrides: [],
+      expect: [{ kind: "text", value: "Welcome", viewpoints: [] }],
+      polarity: "nominal",
+      priority: "P2",
+      viewpoints: [],
+    });
+    const outcome = planGeneration(
+      { ...suite, baselines: [baseline, browserBaseline], cases: [browserCase] },
+      manifest,
+      "TC-BROWSE",
+      "typescript",
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const rendered = renderSpecFileTs(outcome.plan, manifest, {
+      manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
+      outPath: "/plugin/generated/TC-BROWSE.spec.ts",
+    });
+
+    // A generated file that registers `new BrowserExecutor(new
+    // PlaywrightDriver())` without importing PlaywrightDriver fails at
+    // module load with a ReferenceError — the Python counterpart to this
+    // template had exactly that gap (caught by actually running the
+    // generated file, not by a check that "BrowserExecutor" appears
+    // somewhere), so this asserts the import list itself, not just usage.
+    expect(rendered).toMatch(
+      /import \{[^}]*PlaywrightDriver[^}]*\} from "@agentic-test-hub\/runner"/,
+    );
+    expect(rendered).toContain("new BrowserExecutor(new PlaywrightDriver())");
   });
 });

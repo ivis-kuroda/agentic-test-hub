@@ -12,7 +12,7 @@ TypeScript CLI's validated load when the test was generated.
 
 from .assertion import AssertionOutcome, check_assertion, subject_of, text_of
 from .evidence import observe_browser, observe_from_result
-from .executors.browser import BrowserExecutor
+from .executors.browser import BrowserExecutor, PlaywrightDriver
 from .executors.extension import ExtensionExecutor
 from .executors.http import HttpExecutor
 from .executors.shell import ShellExecutor
@@ -41,6 +41,7 @@ __all__ = [
     "HttpExecutor",
     "Manifest",
     "Observation",
+    "PlaywrightDriver",
     "PreparationReport",
     "ScenarioRunResult",
     "ShellExecutor",

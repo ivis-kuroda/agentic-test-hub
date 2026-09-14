@@ -15,6 +15,9 @@ connections:
   api:
     kind: http
     baseUrl: "https://api.invalid/v1"
+  ui:
+    kind: browser
+    baseUrl: "{{env.APP_URL}}"
 
 operations:
   OP-SEND:
@@ -29,6 +32,12 @@ operations:
   OP-SEED-INDEX:
     executor: extension
     handler: seed_search_index
+
+  OP-OPEN:
+    executor: browser
+    connection: ui
+    steps:
+      - { action: goto, url: "{{env.APP_URL}}/" }
 `;
 
 const manifest: PluginManifest = loadManifest(manifestSource).manifest;
@@ -123,6 +132,57 @@ describe("renderSpecFilePy", () => {
 
     expect(rendered).toContain("import plugin.extensions as EXTENSIONS_MODULE");
     expect(rendered).toContain("ExtensionExecutor(EXTENSIONS_MODULE)");
+  });
+
+  it("imports PlaywrightDriver alongside BrowserExecutor when a case needs a browser", () => {
+    const testCase = TestCase.parse({
+      id: "TC-BROWSE",
+      summary: "opens the app",
+      baseline: "BL-TEST",
+      overrides: [],
+      expect: [{ kind: "text", value: "Welcome", viewpoints: [] }],
+      polarity: "nominal",
+      priority: "P2",
+      viewpoints: [],
+    });
+    const browserBaseline = Baseline.parse({
+      id: "BL-BROWSE",
+      title: "opening the app",
+      preconditions: [],
+      config: {},
+      context: {},
+      action: { operation: "OP-OPEN", params: {} },
+    });
+    const outcome = planGeneration(
+      {
+        viewpoints: [],
+        factors: [],
+        matrices: [],
+        baselines: [browserBaseline],
+        cases: [{ ...testCase, baseline: "BL-BROWSE" }],
+        scenarios: [],
+      },
+      manifest,
+      "TC-BROWSE",
+      "python",
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const rendered = renderSpecFilePy(outcome.plan, manifest, {
+      manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
+      outPath: "/plugin/generated/TC-BROWSE.test.py",
+    });
+
+    // A generated file that registers BrowserExecutor(PlaywrightDriver())
+    // without importing PlaywrightDriver fails at collection time with
+    // NameError — caught only by actually running the file with pytest,
+    // not by a check that the string "BrowserExecutor" appears somewhere.
+    expect(rendered).toContain("BrowserExecutor");
+    expect(rendered).toContain("PlaywrightDriver");
+    expect(rendered).toMatch(/from agentic_test_hub_runner import \([^)]*PlaywrightDriver/s);
+    expect(rendered).toContain("BrowserExecutor(PlaywrightDriver())");
   });
 
   it("throws when a plan needs an extension module and none was given", () => {
