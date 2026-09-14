@@ -108,3 +108,31 @@ states:
 evidence:
   app_log:
     operation: OP-READ-LOGS
+
+# The default verdict policy binds all six evidence channels, three of them
+# non-waivable. This target is HTTP-only and collects exactly one channel
+# (app_log), so under the default policy every case would be stuck
+# inconclusive forever — not because anything is wrong, but because five
+# channels this target never promised to collect are reported missing.
+# `rules` must name a condition for every channel (nothing is optional here),
+# so the five this target does not collect are marked `informational`: read
+# and reported if present, but never counted as missing or as deciding the
+# verdict. Only `app_log` actually binds the outcome.
+policy:
+  id: demo-http-only
+  title: dispatch checks judged on the application log, the only channel this target collects
+  rules:
+    nominal:
+      screenshot: informational
+      browser_console: informational
+      browser_network: informational
+      db_records: informational
+      app_log: clean
+      db_log: informational
+    error:
+      screenshot: informational
+      browser_console: informational
+      browser_network: informational
+      db_records: informational
+      app_log: expected_error
+      db_log: informational
