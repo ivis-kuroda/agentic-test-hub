@@ -159,6 +159,20 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # For the Python-generated hub self-tests below — a second toolchain
+      # in this job rather than a step added to the Python job, since those
+      # tests need a running apps/hub instance, and building one needs
+      # pnpm/node, not uv. Running it here also means the build apps/hub's
+      # globalSetup already did for the Playwright tests below is reused
+      # (start-hub.ts skips rebuilding once .output/server/index.mjs
+      # exists) instead of paying for a second one.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: python/agentic-test-hub-runner/uv.lock
+
+      - run: uv sync --locked --project python/agentic-test-hub-runner
+
       # Only the browser this suite uses, with the system libraries it needs.
       # chromium.launch() in packages/runner/src/driver/playwright.ts is
       # called without a `channel`, and Playwright's default headless
@@ -176,8 +190,35 @@ jobs:
       - name: Install the browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: End-to-end tests
+      - name: End-to-end tests (TypeScript)
         run: pnpm e2e
+
+      # Python's playwright package pins its own browser revision,
+      # independently of @playwright/test's — not necessarily the same
+      # build the step above just installed — so it gets its own install
+      # rather than assuming it can reuse that cache.
+      - name: Install the browser (Python)
+        run: uv run --project python/agentic-test-hub-runner playwright install --with-deps chromium
+
+      # The Python-generated counterpart (e2e/generated/python/**) has no
+      # Playwright globalSetup to start apps/hub for it, so it is started
+      # and stopped explicitly around the pytest run — see
+      # e2e/support/hub-up.ts's own doc comment for why this is three
+      # separate commands rather than one script spawning pytest itself.
+      - name: End-to-end tests (Python)
+        run: |
+          eval "$(node e2e/support/hub-up.ts)"
+          # -p no:anyio: anyio ships as a transitive dependency (httpx) and
+          # registers a pytest plugin active by default. Its mere presence
+          # was, in local testing, sometimes enough to leave an asyncio
+          # event loop running around a plain synchronous test function,
+          # tripping Playwright's sync API ("Please use the Async API
+          # instead") the moment a browser-driven test tried to start one.
+          # Nothing here uses anyio, so disabling its plugin costs nothing.
+          uv run --project python/agentic-test-hub-runner pytest -p no:anyio e2e/generated/python
+          test_exit=$?
+          node e2e/support/hub-down.ts
+          exit $test_exit
 
       # Kept only when something failed, where the trace and screenshots are
       # worth their size.
