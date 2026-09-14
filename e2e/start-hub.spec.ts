@@ -11,6 +11,10 @@ import { expect, test } from "@playwright/test";
 
 import { startHubApp, type RunningHub } from "./support/start-hub.ts";
 
+// Whichever test runs first pays apps/hub's one-time production build
+// (~27s in this sandbox, cached for the rest of the process afterwards).
+test.setTimeout(90_000);
+
 test("starts an isolated instance with an empty suite by default", async () => {
   const hub: RunningHub = await startHubApp();
   try {

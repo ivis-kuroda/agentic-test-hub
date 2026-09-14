@@ -1,0 +1,134 @@
+# Plugin manifest for apps/hub itself.
+#
+# This is the second deliberate self-test exception in this repository (the
+# first is examples/demo-app/plugin.yaml). Plugins normally live in a
+# separate repository from the hub — see AGENTS.md — but the whole point of
+# this suite is to use the hub's own spec-authoring and code-generation
+# pipeline to test the hub's own product, `apps/hub`, rather than a fixture
+# built solely to stand in for "some real target". `e2e/support/start-hub.ts`
+# launches a real `apps/hub` instance against a disposable, seeded
+# `SPECS_ROOT` for every test file that uses this manifest.
+#
+# Evidence and policy: apps/hub exposes no log-reading endpoint, so nothing
+# collects app_log, db_log or db_records for any case here — they are marked
+# informational below, same as demo-app marks channels it cannot supply.
+# browser_console and browser_network *are* real, collectible channels, but
+# only for cases that actually open a browser session; a pure-API case has no
+# session and can never supply them. Rather than leave those cases
+# permanently inconclusive, each pure-API case is expected to waive
+# browser_console/browser_network in its own spec (with a reason), which
+# `nonWaivable` below permits.
+apiVersion: "1"
+name: hub-self-test
+description: the hub's own product, apps/hub, tested by the hub's own pipeline
+
+connections:
+  api:
+    kind: http
+    baseUrl: "{{env.HUB_URL}}"
+    headers:
+      Accept: application/json
+
+  ui:
+    kind: browser
+    baseUrl: "{{env.HUB_URL}}"
+
+operations:
+  OP-GET-SUITE:
+    executor: http
+    connection: api
+    path: /api/suite
+
+  OP-GET-ENTITY:
+    executor: http
+    connection: api
+    path: "/api/specs/{{param.kind}}/{{param.id}}"
+    params: [kind, id]
+
+  # Creates or updates one entity. expectedHash is omitted by the caller for
+  # a create; passing it (via OP-UPDATE-ENTITY below) targets an update and
+  # is checked against the file's current hash, 409 on mismatch.
+  OP-CREATE-ENTITY:
+    executor: http
+    connection: api
+    method: PUT
+    path: "/api/specs/{{param.kind}}"
+    params: [kind, entity]
+    body:
+      entity: "{{param.entity}}"
+
+  OP-UPDATE-ENTITY:
+    executor: http
+    connection: api
+    method: PUT
+    path: "/api/specs/{{param.kind}}"
+    params: [kind, entity, expectedHash]
+    body:
+      entity: "{{param.entity}}"
+      expectedHash: "{{param.expectedHash}}"
+
+  OP-DELETE-ENTITY:
+    executor: http
+    connection: api
+    method: DELETE
+    path: "/api/specs/{{param.kind}}/{{param.id}}?expectedHash={{param.expectedHash}}"
+    params: [kind, id, expectedHash]
+
+  OP-OPEN-CASE-EDITOR:
+    executor: browser
+    connection: ui
+    params: [id]
+    steps:
+      - { action: goto, url: "{{env.HUB_URL}}/cases/{{param.id}}" }
+      - { action: waitFor, selector: "[data-testid=case-summary]" }
+
+  OP-EDIT-CASE-SUMMARY:
+    executor: browser
+    connection: ui
+    params: [id, summary]
+    steps:
+      - { action: goto, url: "{{env.HUB_URL}}/cases/{{param.id}}" }
+      - { action: waitFor, selector: "[data-testid=case-summary]" }
+      - { action: fill, selector: "[data-testid=case-summary]", value: "{{param.summary}}" }
+      - { action: click, selector: "[data-testid=save]" }
+
+states:
+  suite.reachable:
+    description: the hub answers /api/suite
+    ensure:
+      operation: OP-GET-SUITE
+    verify:
+      operation: OP-GET-SUITE
+      assert: { kind: contains, value: '"suite"' }
+    cost: low
+
+evidence: {}
+
+# See the header comment: nothing collects app_log/db_log/db_records for any
+# case, so all three are informational. screenshot is informational too,
+# same as demo-app (a screenshot is never proof by itself — see
+# `insufficientAlone` — and this target has no case that judges by
+# appearance yet). browser_console and browser_network are real, bound
+# channels for cases that open a browser session; `nonWaivable` is narrowed
+# from the default so a pure-API case can waive both with a stated reason
+# instead of sitting inconclusive forever for evidence it structurally
+# cannot produce.
+policy:
+  id: hub-self-test
+  title: browser-driven hub cases judged on console and network; API-only cases waive both
+  rules:
+    nominal:
+      screenshot: informational
+      browser_console: clean
+      browser_network: success_response
+      db_records: informational
+      app_log: informational
+      db_log: informational
+    error:
+      screenshot: informational
+      browser_console: informational
+      browser_network: error_response
+      db_records: informational
+      app_log: informational
+      db_log: informational
+  nonWaivable: []

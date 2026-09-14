@@ -5,15 +5,23 @@
  *
  * Unlike demo-app's dependency-free in-process HTTP server, `apps/hub` is a
  * full Nuxt application with no "start programmatically" export, so this
- * spawns it as a child process instead. `nuxt dev` (not a production build)
- * is used deliberately: startup was measured at ~6.5s cold in this sandbox,
- * acceptable to pay once per test *file* (see below) rather than adding a
- * build step; revisit only if that stops holding in CI.
+ * spawns it as a child process instead — a production build (`nuxt build`,
+ * then `node .output/server/index.mjs`), not `nuxt dev`. That was not the
+ * first choice: dev mode's cold *server* startup measured only ~6.5s, which
+ * looked acceptable. What dev mode does not offer is fast *hydration* —
+ * it serves the client bundle as dozens of individual unbundled ES modules,
+ * and a browser step that interacts with the page (a click, a fill) before
+ * Vue has finished attaching its event listeners fails silently: the DOM
+ * click "succeeds" with no error, but nothing happens, because dev mode's
+ * hydration was still in flight. The production build hydrates in under a
+ * second in this sandbox and does not have that race. The build itself
+ * (~27s) is cached per process via {@link ensureBuilt} so it is paid once
+ * per test run, not once per file.
  *
- * A fresh instance is intended once per test file (`test.beforeAll`), not
- * per case — restarting a full Nuxt process per case would be far slower
- * than demo-app's instant in-memory server. Individual cases should create
- * and delete their own uniquely-ID'd entities rather than relying on the
+ * A fresh server instance is intended once per test file (`test.beforeAll`),
+ * not per case — spawning a new process per case would be far slower than
+ * demo-app's instant in-memory server. Individual cases should create and
+ * delete their own uniquely-ID'd entities rather than relying on the
  * directory being reset between them.
  */
 import { spawn, type ChildProcess } from "node:child_process";
@@ -24,10 +32,34 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-/** `apps/hub`'s own package directory — where `nuxt dev` is run from. */
+/** `apps/hub`'s own package directory — where it is built and run from. */
 const HUB_ROOT = join(HERE, "..", "..", "apps", "hub");
+/** The built server's entry point, once `pnpm build` has run. */
+const HUB_SERVER_ENTRY = join(HUB_ROOT, ".output", "server", "index.mjs");
 /** Seed content copied into a fresh `SPECS_ROOT` for every run. */
 const DEFAULT_FIXTURE_SPECS = join(HERE, "..", "fixtures", "specs");
+
+/**
+ * Builds `apps/hub` once per process and reuses the result.
+ *
+ * The build output does not depend on `SPECS_ROOT` — that is read at request
+ * time, not baked in — so every `startHubApp()` call in this process can
+ * share one build. A second concurrent caller awaits the same in-flight
+ * build rather than starting a second one.
+ */
+let buildOnce: Promise<void> | undefined;
+
+async function ensureBuilt(): Promise<void> {
+  buildOnce ??= new Promise((resolve, reject) => {
+    const build = spawn("pnpm", ["build"], { cwd: HUB_ROOT, stdio: "ignore" });
+    build.once("error", reject);
+    build.once("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`apps/hub build failed with exit code ${code}`));
+    });
+  });
+  await buildOnce;
+}
 
 /** A running `apps/hub` instance under test. */
 export interface RunningHub {
@@ -128,16 +160,17 @@ async function stopProcess(child: ChildProcess): Promise<void> {
  * @returns The running instance: its URL, its temp `SPECS_ROOT`, and `stop()`.
  */
 export async function startHubApp(options: StartHubOptions = {}): Promise<RunningHub> {
+  await ensureBuilt();
   const specsRoot = await seedSpecsRoot(options.fixtureSpecs ?? DEFAULT_FIXTURE_SPECS);
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
 
-  const child = spawn("pnpm", ["dev", "--port", String(port)], {
+  const child = spawn(process.execPath, [HUB_SERVER_ENTRY], {
     cwd: HUB_ROOT,
-    env: { ...process.env, SPECS_ROOT: specsRoot },
+    env: { ...process.env, SPECS_ROOT: specsRoot, PORT: String(port), HOST: "127.0.0.1" },
     stdio: "ignore",
-    // Its own process group, so stopProcess can kill Nuxt's own child
-    // workers too rather than orphaning them.
+    // Its own process group, so stopProcess can kill any child workers the
+    // Nitro server starts too, rather than orphaning them.
     detached: true,
   });
 
