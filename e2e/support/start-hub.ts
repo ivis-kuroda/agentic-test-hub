@@ -15,8 +15,9 @@
  * click "succeeds" with no error, but nothing happens, because dev mode's
  * hydration was still in flight. The production build hydrates in under a
  * second in this sandbox and does not have that race. The build itself
- * (~27s) is cached per process via {@link ensureBuilt} so it is paid once
- * per test run, not once per file.
+ * (~27s) is shared across every caller, in this process and any others
+ * running concurrently, via {@link ensureBuilt} — see its own doc comment —
+ * so it is paid once per test run, not once per file or per worker.
  *
  * A fresh server instance is intended once per test file (`test.beforeAll`),
  * not per case — spawning a new process per case would be far slower than
@@ -25,7 +26,7 @@
  * directory being reset between them.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { cp, mkdtemp, open, rm } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, open, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -34,30 +35,90 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** `apps/hub`'s own package directory — where it is built and run from. */
 const HUB_ROOT = join(HERE, "..", "..", "apps", "hub");
+/** Held by whichever process is currently running `pnpm build` (see {@link ensureBuilt}). */
+const HUB_BUILD_LOCK_DIR = join(HUB_ROOT, ".output-building");
 /** The built server's entry point, once `pnpm build` has run. */
 const HUB_SERVER_ENTRY = join(HUB_ROOT, ".output", "server", "index.mjs");
 /** Seed content copied into a fresh `SPECS_ROOT` for every run. */
 const DEFAULT_FIXTURE_SPECS = join(HERE, "..", "fixtures", "specs");
 
 /**
- * Builds `apps/hub` once per process and reuses the result.
+ * Builds `apps/hub` once and reuses the result — including across separate
+ * *processes*, not only within one: Playwright runs this suite's test files
+ * across several worker processes in parallel, each an independent Node
+ * process with no shared in-memory state, so an in-process-only cache (a
+ * plain module-level promise) does not stop two workers from calling this
+ * at nearly the same moment and both starting `pnpm build`, clobbering the
+ * same `.output` mid-write — found exactly this way in CI, where multiple
+ * workers really do race this, unlike every local run in this sandbox so
+ * far (always started with `--workers=1`).
  *
- * The build output does not depend on `SPECS_ROOT` — that is read at request
- * time, not baked in — so every `startHubApp()` call in this process can
- * share one build. A second concurrent caller awaits the same in-flight
- * build rather than starting a second one.
+ * `mkdir` on `HUB_BUILD_LOCK_DIR` is the cross-process lock: it is atomic
+ * (POSIX guarantees `EEXIST` for a second caller, never two callers both
+ * succeeding), so exactly one process ever proceeds to build; every other
+ * caller — in this process or another — polls for `HUB_SERVER_ENTRY` to
+ * appear instead. The build writes into `HUB_OUTPUT_DIR` directly (Nitro's
+ * own output path, not reconfigurable per-call), so a poller can only tell
+ * "done" from "not started yet" by the entry file's existence, which is why
+ * the lock directory is removed only *after* a successful build confirms
+ * that file is actually there.
  */
 let buildOnce: Promise<void> | undefined;
 
+async function waitForEntry(timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await accessible(HUB_SERVER_ENTRY)) return true;
+    await new Promise((settle) => setTimeout(settle, 300));
+  }
+  return accessible(HUB_SERVER_ENTRY);
+}
+
+async function accessible(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureBuilt(): Promise<void> {
-  buildOnce ??= new Promise((resolve, reject) => {
-    const build = spawn("pnpm", ["build"], { cwd: HUB_ROOT, stdio: "ignore" });
-    build.once("error", reject);
-    build.once("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`apps/hub build failed with exit code ${code}`));
-    });
-  });
+  buildOnce ??= (async () => {
+    if (await accessible(HUB_SERVER_ENTRY)) return;
+
+    try {
+      await mkdir(HUB_BUILD_LOCK_DIR);
+    } catch (cause) {
+      if ((cause as { code?: string }).code !== "EEXIST") throw cause;
+      // Another process (this one or a sibling worker) is already building;
+      // wait for its result rather than racing it.
+      const ready = await waitForEntry(180_000);
+      if (!ready) {
+        throw new Error(
+          `apps/hub build did not finish (started by another process) within 180000ms`,
+        );
+      }
+      return;
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        // Inherited, not "ignore": a build failure with its output
+        // swallowed is undiagnosable from the test failure alone (found
+        // the hard way — CI reported only "apps/hub build failed with exit
+        // code 1", no output).
+        const build = spawn("pnpm", ["build"], { cwd: HUB_ROOT, stdio: "inherit" });
+        build.once("error", reject);
+        build.once("exit", (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`apps/hub build failed with exit code ${code}`));
+        });
+      });
+    } finally {
+      await rm(HUB_BUILD_LOCK_DIR, { recursive: true, force: true });
+    }
+  })();
   await buildOnce;
 }
 
@@ -74,6 +135,12 @@ export interface RunningHub {
    * (via `{{env.HUB_LOG_FILE}}`) instead of an HTTP call.
    */
   readonly logFile: string;
+  /**
+   * The server process's id, for stopping it from a separate later
+   * invocation (see `hub-up.ts`/`hub-down.ts`) rather than only via the
+   * `stop()` closure here, which needs the same process alive to call.
+   */
+  readonly pid: number;
   /** Stops the Nuxt process and removes the temporary `SPECS_ROOT`. Idempotent. */
   stop(): Promise<void>;
 }
@@ -183,6 +250,12 @@ export async function startHubApp(options: StartHubOptions = {}): Promise<Runnin
     // Nitro server starts too, rather than orphaning them.
     detached: true,
   });
+  // Never by itself a reason for this process to stay alive — normal
+  // callers (a test file, Playwright's global-setup) have other work doing
+  // that already, and hub-up.ts (which has none) depends on this to exit
+  // once it has printed the running instance's details, leaving the server
+  // running as a detached process behind it.
+  child.unref();
 
   let logClosed = false;
   const cleanupLog = async (): Promise<void> => {
@@ -205,10 +278,50 @@ export async function startHubApp(options: StartHubOptions = {}): Promise<Runnin
     url,
     specsRoot,
     logFile,
+    pid: child.pid!,
     stop: async () => {
       await stopProcess(child);
       await rm(specsRoot, { recursive: true, force: true });
       await cleanupLog();
     },
   };
+}
+
+/**
+ * Kills the process group headed by `pid`, waiting for it to actually exit.
+ *
+ * The counterpart to {@link stopProcess} for a caller that only has a PID,
+ * not the original `ChildProcess` — `hub-down.ts`, run as its own fresh
+ * process well after the one that started the server has already exited.
+ * Polls for death with signal `0` (raises `ESRCH` once the process is gone)
+ * since there is no `child.once("exit", ...)` to await here.
+ */
+export async function stopByPid(pid: number, timeoutMs = 10_000): Promise<void> {
+  const isAlive = (): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!isAlive()) return;
+
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    // Already gone, or never had its own process group.
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (isAlive() && Date.now() < deadline) {
+    await new Promise((settle) => setTimeout(settle, 200));
+  }
+  if (isAlive()) {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
 }

@@ -15,6 +15,10 @@ blob-report/
 # Nuxt build output.
 apps/hub/.nuxt/
 apps/hub/.output/
+apps/hub/.output-building/
+
+# State for e2e/support/hub-up.ts / hub-down.ts.
+e2e/.hub-state.json
 
 # Python.
 .venv/
