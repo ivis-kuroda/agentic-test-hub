@@ -141,7 +141,7 @@ function removeTag(index: number): void {
       required
       description="The condition under test, e.g. 'the request carries no filename'."
     >
-      <UTextarea v-model="model.summary" :rows="2" class="w-full" />
+      <UTextarea v-model="model.summary" :rows="2" class="w-full" data-testid="case-summary" />
     </UFormField>
 
     <UFormField label="Baseline" required>

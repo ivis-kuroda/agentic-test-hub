@@ -29,7 +29,7 @@ async function create(): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-xl font-semibold mb-4">New case</h1>
+    <h1 class="text-xl font-semibold mb-4" data-testid="heading">New case</h1>
     <CaseEditor
       v-model="draft"
       :id-editable="true"
@@ -48,7 +48,7 @@ async function create(): Promise<void> {
     <ConflictAlert :conflict="conflict" @overwrite="create" />
 
     <div class="mt-6">
-      <UButton label="Create" :loading="saving" @click="create" />
+      <UButton label="Create" :loading="saving" data-testid="save" @click="create" />
     </div>
   </div>
 </template>

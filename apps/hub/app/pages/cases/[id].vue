@@ -34,7 +34,7 @@ async function persist(force = false): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-xl font-semibold mb-4">{{ id }}</h1>
+    <h1 class="text-xl font-semibold mb-4" data-testid="heading">{{ id }}</h1>
     <CaseEditor
       v-model="draft"
       :baselines="baselines"
@@ -52,7 +52,7 @@ async function persist(force = false): Promise<void> {
     <ConflictAlert :conflict="conflict" @overwrite="persist(true)" />
 
     <div class="mt-6">
-      <UButton label="Save" :loading="saving" @click="persist(false)" />
+      <UButton label="Save" :loading="saving" data-testid="save" @click="persist(false)" />
     </div>
   </div>
 </template>

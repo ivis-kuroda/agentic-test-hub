@@ -11,7 +11,7 @@ const automationColor: Record<string, "neutral" | "warning" | "success"> = {
 <template>
   <div class="max-w-4xl">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-semibold">Cases</h1>
+      <h1 class="text-xl font-semibold" data-testid="heading">Cases</h1>
       <UButton to="/cases/new" label="New case" />
     </div>
 
