@@ -35,6 +35,14 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
+  // Starts one apps/hub instance that every generated hub-self-test file
+  // shares — see e2e/support/global-setup.ts for why a shared instance, not
+  // one per file, is what generated code's fixed shape actually allows. Only
+  // a top-level globalSetup's `process.env` writes reach worker processes
+  // (this Playwright version has no working per-project equivalent — tried,
+  // confirmed silently inert), so this always runs, even for a `demo-app`-
+  // only invocation, at the cost of a redundant apps/hub build in that case.
+  globalSetup: "./e2e/support/global-setup.ts",
   projects: [
     { name: "demo-app", testDir: "./examples/demo-app/e2e" },
     { name: "hub-self-test", testDir: "./e2e" },
