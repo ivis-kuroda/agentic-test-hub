@@ -98,15 +98,22 @@ export function renderSpecFilePy(
   const title = plan.kind === "case" ? plan.testCase.summary : plan.scenario.title;
   const functionName = testFunctionName(plan.id);
 
+  // Python's run_case never resolves overrides itself (that logic is
+  // TypeScript-only, run once at generation time) — it receives the
+  // already-resolved baseline (plan.resolved) and the already-derived
+  // action params (plan.params) directly, rather than a raw baseline plus
+  // the case's own overrides the way the TypeScript template's runCase call
+  // does.
   const dataDecl =
     plan.kind === "case"
-      ? `BASELINE = ${pythonJsonLiteral(plan.baseline)}
+      ? `RESOLVED = ${pythonJsonLiteral(plan.resolved)}
+ACTION_PARAMS = ${pythonJsonLiteral(plan.params)}
 TEST_CASE = ${pythonJsonLiteral(entity)}`
       : `SCENARIO = ${pythonJsonLiteral(entity)}`;
 
   const call =
     plan.kind === "case"
-      ? "run_case(TEST_CASE, BASELINE, registry, context)"
+      ? "run_case(TEST_CASE, RESOLVED, ACTION_PARAMS, registry, context)"
       : "run_scenario(SCENARIO, registry, context)";
 
   const extensionsImport =

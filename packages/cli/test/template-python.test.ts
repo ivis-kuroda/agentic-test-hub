@@ -79,10 +79,10 @@ describe("renderSpecFilePy", () => {
     expect(rendered).not.toContain("ExtensionExecutor");
     expect(rendered).toContain('MANIFEST_PATH = Path(__file__).parent / "../plugin.yaml"');
     expect(rendered).toContain("def test_tc_dispatch_002() -> None:");
-    expect(rendered).toContain("run_case(TEST_CASE, BASELINE, registry, context)");
+    expect(rendered).toContain("run_case(TEST_CASE, RESOLVED, ACTION_PARAMS, registry, context)");
     expect(rendered).toContain('assert result.verdict == "pass", result');
     // json.loads over a JSON-escaped literal, not raw Python data syntax:
-    expect(rendered).toContain("BASELINE = json.loads(");
+    expect(rendered).toContain("RESOLVED = json.loads(");
     expect(rendered).toContain('\\"sms\\"');
   });
 

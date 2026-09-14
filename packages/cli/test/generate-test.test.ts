@@ -214,7 +214,7 @@ describe("main (ath-generate-test)", () => {
     expect(code).toBe(0);
     const outPath = join(pluginRoot, "generated", "TC-DISPATCH-002.test.py");
     const generated = await readFile(outPath, "utf8");
-    expect(generated).toContain("run_case(TEST_CASE, BASELINE, registry, context)");
+    expect(generated).toContain("run_case(TEST_CASE, RESOLVED, ACTION_PARAMS, registry, context)");
   });
 
   it("reports a usage error and exits 2 when a required flag is missing", async () => {
