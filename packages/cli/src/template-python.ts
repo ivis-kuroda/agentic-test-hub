@@ -12,11 +12,11 @@ const EXECUTOR_IMPORTS: Readonly<Record<string, string>> = {
   extension: "ExtensionExecutor",
 };
 
-/** A relative path a generated Python file loads its manifest from, POSIX-style. */
-function importPathFor(target: RenderTarget): string {
+/** A relative path from the generated file to `to`, POSIX-style. */
+function relativeImportPath(target: RenderTarget, to: string): string {
   const rel = relative(
     target.outPath.slice(0, Math.max(0, target.outPath.lastIndexOf("/"))) || ".",
-    target.manifestPath,
+    to,
   )
     .split("\\")
     .join("/");
@@ -36,13 +36,28 @@ function registrations(kinds: readonly string[]): string {
   return lines.join("\n");
 }
 
-/** A valid, readable Python identifier for a case/scenario id like `TC-DISPATCH-002`. */
-function testFunctionName(id: string): string {
+/**
+ * A valid, readable Python identifier for a case/scenario id like
+ * `TC-DISPATCH-002` — `test_tc_dispatch_002`.
+ *
+ * Used for both the generated test function's name and (by
+ * {@link pythonModuleName}) the file it lives in: pytest imports a test file
+ * as a module named after its own filename stem, and a stem containing a
+ * hyphen (`TC-DISPATCH-002.py`) is not a valid module name and fails to
+ * import at all — caught by actually running a generated file with pytest,
+ * not by the unit tests alone.
+ */
+export function testFunctionName(id: string): string {
   const slug = id
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   return `test_${slug}`;
+}
+
+/** A valid Python module filename stem for a case/scenario id, e.g. `test_tc_dispatch_002`. */
+export function pythonModuleName(id: string): string {
+  return testFunctionName(id);
 }
 
 /**
@@ -93,7 +108,8 @@ export function renderSpecFilePy(
     plan.kind === "case" ? "run_case" : "run_scenario",
   ];
 
-  const manifestImportPath = importPathFor(target);
+  const manifestImportPath = relativeImportPath(target, target.manifestPath);
+  const pluginRootImportPath = relativeImportPath(target, target.pluginRoot);
   const entity = plan.kind === "case" ? plan.testCase : plan.scenario;
   const title = plan.kind === "case" ? plan.testCase.summary : plan.scenario.title;
   const functionName = testFunctionName(plan.id);
@@ -136,6 +152,12 @@ from agentic_test_hub_runner import (
 
 MANIFEST_PATH = Path(__file__).parent / ${JSON.stringify(manifestImportPath)}
 MANIFEST = load_manifest(MANIFEST_PATH.read_text())
+# Not MANIFEST_PATH.parent: a manifest's shell/http-bodyFile relative paths
+# are resolved against the plugin repository root, which can differ from
+# the manifest file's own directory (examples/demo-app/plugin.yaml's own
+# operations reach "examples/demo-app/cli.ts", rooted at the repo, not at
+# examples/demo-app itself).
+PLUGIN_ROOT = (Path(__file__).parent / ${JSON.stringify(pluginRootImportPath)}).resolve()
 
 ${dataDecl}
 
@@ -148,7 +170,7 @@ ${registrations(kinds)}
     # variables when running the generated test, so scopes["env"] defaults
     # to os.environ rather than being left empty.
     context = ExecutionContext(
-        manifest=MANIFEST, scopes={"env": dict(os.environ)}, root=str(MANIFEST_PATH.parent)
+        manifest=MANIFEST, scopes={"env": dict(os.environ)}, root=str(PLUGIN_ROOT)
     )
     result = ${call}
     assert result.verdict == "pass", result

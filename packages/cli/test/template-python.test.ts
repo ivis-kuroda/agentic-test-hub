@@ -71,6 +71,7 @@ describe("renderSpecFilePy", () => {
 
     const rendered = renderSpecFilePy(outcome.plan, manifest, {
       manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
       outPath: "/plugin/generated/TC-DISPATCH-002.test.py",
     });
 
@@ -112,7 +113,11 @@ describe("renderSpecFilePy", () => {
     const rendered = renderSpecFilePy(
       outcome.plan,
       manifest,
-      { manifestPath: "/plugin/plugin.yaml", outPath: "/plugin/generated/TC-EXT.test.py" },
+      {
+        manifestPath: "/plugin/plugin.yaml",
+        pluginRoot: "/plugin",
+        outPath: "/plugin/generated/TC-EXT.test.py",
+      },
       "plugin.extensions",
     );
 
@@ -151,6 +156,7 @@ describe("renderSpecFilePy", () => {
     expect(() =>
       renderSpecFilePy(outcome.plan, manifest, {
         manifestPath: "/plugin/plugin.yaml",
+        pluginRoot: "/plugin",
         outPath: "/plugin/generated/TC-EXT.test.py",
       }),
     ).toThrow(/extensionsModule/);

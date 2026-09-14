@@ -1,5 +1,6 @@
 import {
   applyOverrides,
+  DEFAULT_EVIDENCE_PLAN,
   type Baseline,
   type ResolvedBaseline,
   type Scenario,
@@ -54,14 +55,54 @@ function refuse(reason: string, paths: readonly string[] = []): PlanOutcome {
   return { ok: false, refusal: { reason, paths } };
 }
 
-/** Every operation id a plan's action(s) and `operation_result` expectations invoke. */
-export function operationsTouched(plan: GenerationPlan): readonly string[] {
+/** Every operation a set of state names' `ensure`/`verify` steps invoke. */
+function stateOperationIds(names: readonly string[], manifest: PluginManifest): string[] {
+  const ids: string[] = [];
+  for (const name of names) {
+    const provider = manifest.states[name];
+    if (!provider) continue;
+    ids.push(provider.ensure.operation, provider.verify.operation);
+  }
+  return ids;
+}
+
+/** Evidence sources collected by running an operation (`collectEvidence`'s own division). */
+const COLLECTED_BY_OPERATION = ["db_records", "app_log", "db_log"] as const;
+
+/** Every collector operation an evidence plan's sources actually invoke. */
+function evidenceOperationIds(sources: readonly string[], manifest: PluginManifest): string[] {
+  const ids: string[] = [];
+  for (const source of COLLECTED_BY_OPERATION) {
+    if (!sources.includes(source)) continue;
+    const call = manifest.evidence[source];
+    if (call) ids.push(call.operation);
+  }
+  return ids;
+}
+
+/**
+ * Every operation id a plan actually invokes at run time: its action(s),
+ * `operation_result` expectations, its preconditions' `ensure`/`verify`
+ * operations (`runCase`/`runScenario` prepare these before the action ever
+ * runs — see `packages/runner/src/state.ts`), and whichever evidence
+ * collectors its evidence plan calls for (`collectEvidence`). Missing any of
+ * these means a generated test's registry lacks an executor it needs the
+ * moment it actually runs against a live target — found by running one for
+ * real, not by the unit tests alone.
+ */
+export function operationsTouched(
+  plan: GenerationPlan,
+  manifest: PluginManifest,
+): readonly string[] {
   const ids = new Set<string>();
   if (plan.kind === "case") {
     ids.add(plan.operationId);
     for (const expectation of plan.testCase.expect) {
       if (expectation.kind === "operation_result") ids.add(expectation.operation);
     }
+    for (const id of stateOperationIds(plan.resolved.preconditions, manifest)) ids.add(id);
+    const sources = plan.testCase.evidence?.sources ?? DEFAULT_EVIDENCE_PLAN.sources;
+    for (const id of evidenceOperationIds(sources, manifest)) ids.add(id);
   } else {
     for (const step of plan.scenario.steps) {
       if (step.action !== undefined) ids.add(step.action.operation);
@@ -69,6 +110,9 @@ export function operationsTouched(plan: GenerationPlan): readonly string[] {
         if (expectation.kind === "operation_result") ids.add(expectation.operation);
       }
     }
+    for (const id of stateOperationIds(plan.scenario.preconditions, manifest)) ids.add(id);
+    const sources = plan.scenario.evidence?.sources ?? DEFAULT_EVIDENCE_PLAN.sources;
+    for (const id of evidenceOperationIds(sources, manifest)) ids.add(id);
   }
   return [...ids];
 }
@@ -79,7 +123,7 @@ export function executorKindsFor(
   manifest: PluginManifest,
 ): readonly Operation["executor"][] {
   const kinds = new Set<Operation["executor"]>();
-  for (const id of operationsTouched(plan)) {
+  for (const id of operationsTouched(plan, manifest)) {
     const operation = manifest.operations[id];
     if (operation) kinds.add(operation.executor);
   }
@@ -111,7 +155,7 @@ function refuseIfUnsupportedExecutor(
   language: GenerationLanguage,
 ): PlanOutcome | undefined {
   const unsupported = new Set(unsupportedExecutors(language));
-  const badOperations = operationsTouched(plan).filter((id) => {
+  const badOperations = operationsTouched(plan, manifest).filter((id) => {
     const executor = manifest.operations[id]?.executor;
     return executor !== undefined && unsupported.has(executor);
   });

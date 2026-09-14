@@ -5,7 +5,7 @@ import { loadManifest } from "@agentic-test-hub/plugin";
 import { SpecStore } from "@agentic-test-hub/store";
 
 import { planGeneration, type GenerationLanguage } from "./plan.ts";
-import { renderSpecFilePy } from "./template-python.ts";
+import { pythonModuleName, renderSpecFilePy } from "./template-python.ts";
 import { renderSpecFileTs } from "./template-typescript.ts";
 import { writeGeneratedCase } from "./write-back.ts";
 
@@ -147,9 +147,18 @@ export async function main(argv: readonly string[], io: CliIO): Promise<number> 
     return 1;
   }
 
-  const extension = args.lang === "typescript" ? "spec.ts" : "test.py";
-  const outPath = args.out ?? resolvePath(args.pluginRoot, "generated", `${args.id}.${extension}`);
-  const target = { manifestPath: pluginPath, outPath };
+  // A Python file's name becomes the module pytest imports it as, so it
+  // must be a valid identifier — args.id (TC-DISPATCH-002) is not, having
+  // hyphens, so the Python default uses the same slug as the generated
+  // test function's own name rather than the case/scenario id verbatim.
+  const defaultName =
+    args.lang === "typescript" ? `${args.id}.spec.ts` : `${pythonModuleName(args.id)}.py`;
+  const outPath = args.out ?? resolvePath(args.pluginRoot, "generated", defaultName);
+  const target = {
+    manifestPath: pluginPath,
+    pluginRoot: resolvePath(args.pluginRoot),
+    outPath,
+  };
 
   const rendered =
     args.lang === "typescript"

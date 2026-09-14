@@ -212,7 +212,7 @@ describe("main (ath-generate-test)", () => {
     );
 
     expect(code).toBe(0);
-    const outPath = join(pluginRoot, "generated", "TC-DISPATCH-002.test.py");
+    const outPath = join(pluginRoot, "generated", "test_tc_dispatch_002.py");
     const generated = await readFile(outPath, "utf8");
     expect(generated).toContain("run_case(TEST_CASE, RESOLVED, ACTION_PARAMS, registry, context)");
   });

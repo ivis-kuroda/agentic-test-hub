@@ -65,6 +65,7 @@ describe("renderSpecFileTs", () => {
 
     const rendered = renderSpecFileTs(outcome.plan, manifest, {
       manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
       outPath: "/plugin/generated/TC-DISPATCH-002.spec.ts",
     });
 
@@ -110,6 +111,7 @@ describe("renderSpecFileTs", () => {
 
     const rendered = renderSpecFileTs(outcome.plan, manifest, {
       manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
       outPath: "/plugin/generated/SC-DISPATCH.spec.ts",
     });
 

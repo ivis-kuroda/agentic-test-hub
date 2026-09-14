@@ -4,10 +4,19 @@ import type { PluginManifest } from "@agentic-test-hub/plugin";
 
 import { executorKindsFor, type GenerationPlan } from "./plan.ts";
 
-/** Where a generated file will live, and what it needs to reach the manifest. */
+/** Where a generated file will live, and what it needs to reach the manifest and plugin root. */
 export interface RenderTarget {
   /** Absolute path to the plugin manifest the generated file loads at run time. */
   readonly manifestPath: string;
+  /**
+   * Absolute path to the plugin repository root — what a manifest's
+   * shell/http-bodyFile relative paths are resolved against
+   * (`ExecutionContext.root`). Not necessarily `dirname(manifestPath)`: a
+   * manifest commonly lives inside a subdirectory of the repository its
+   * operations' relative paths (`examples/demo-app/cli.ts`, say) are
+   * actually rooted at.
+   */
+  readonly pluginRoot: string;
   /** Absolute path the generated file will be written to. */
   readonly outPath: string;
 }
@@ -19,8 +28,8 @@ const EXECUTOR_IMPORTS: Readonly<Record<string, string>> = {
 };
 
 /** A relative path suitable for a generated file's own `import.meta.url`-based lookup. */
-function importPathFor(target: RenderTarget): string {
-  const rel = relative(dirname(target.outPath), target.manifestPath).split("\\").join("/");
+function relativeImportPath(from: string, to: string): string {
+  const rel = relative(dirname(from), to).split("\\").join("/");
   return rel.startsWith(".") ? rel : `./${rel}`;
 }
 
@@ -61,7 +70,8 @@ export function renderSpecFileTs(
     plan.kind === "case" ? "runCase" : "runScenario",
   ];
 
-  const manifestImportPath = importPathFor(target);
+  const manifestImportPath = relativeImportPath(target.outPath, target.manifestPath);
+  const pluginRootImportPath = relativeImportPath(target.outPath, target.pluginRoot);
   const entity = plan.kind === "case" ? plan.testCase : plan.scenario;
   const title = plan.kind === "case" ? plan.testCase.summary : plan.scenario.title;
 
@@ -86,7 +96,6 @@ const testCase = TestCase.parse(${JSON.stringify(entity, null, 2)});`
  * around the generated call are yours to extend.
  */
 import { readFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
@@ -98,6 +107,12 @@ import { ${runnerImports.join(", ")} } from "@agentic-test-hub/runner";
 
 const manifestPath = fileURLToPath(new URL(${JSON.stringify(manifestImportPath)}, import.meta.url));
 const manifest = loadManifest(readFileSync(manifestPath, "utf8")).manifest;
+// Not dirname(manifestPath): a manifest's shell/http-bodyFile relative paths
+// are resolved against the plugin repository root, which can differ from
+// the manifest file's own directory (examples/demo-app/plugin.yaml's own
+// operations reach "examples/demo-app/cli.ts", rooted at the repo, not at
+// examples/demo-app itself).
+const pluginRoot = fileURLToPath(new URL(${JSON.stringify(pluginRootImportPath)}, import.meta.url));
 
 ${dataDecl}
 
@@ -109,11 +124,7 @@ ${registrations(kinds)}
   // variables when running the generated test, the same convention the
   // manifest itself uses, so scopes.env defaults to process.env rather than
   // being left empty.
-  const context: ExecutionContext = {
-    manifest,
-    scopes: { env: process.env },
-    root: dirname(manifestPath),
-  };
+  const context: ExecutionContext = { manifest, scopes: { env: process.env }, root: pluginRoot };
 ${body}
 });
 `;

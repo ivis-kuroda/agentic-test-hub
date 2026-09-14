@@ -51,6 +51,19 @@ operations:
   OP-SEED-INDEX:
     executor: extension
     handler: seed_search_index
+
+  OP-COUNT:
+    executor: shell
+    run: ["true"]
+    timeoutMs: 5000
+
+states:
+  queue.empty:
+    ensure: { operation: OP-COUNT }
+    verify:
+      operation: OP-COUNT
+      assert: { kind: equals, value: 0 }
+    cost: low
 `;
 
 const manifest: PluginManifest = loadManifest(manifestSource).manifest;
@@ -110,7 +123,7 @@ describe("planGeneration", () => {
       const plan = outcome.plan;
       if (plan.kind !== "case") throw new Error("expected a case plan");
       expect(plan.operationId).toBe("OP-SEND");
-      expect(operationsTouched(plan)).toEqual(["OP-SEND"]);
+      expect(operationsTouched(plan, manifest)).toEqual(["OP-SEND"]);
       expect(executorKindsFor(plan, manifest)).toEqual(["http"]);
     }
   });
@@ -166,6 +179,28 @@ describe("planGeneration", () => {
 
     const py = planGeneration(suiteWith({ cases: [testCase] }), manifest, "TC-EXT", "python");
     expectOk(py);
+  });
+
+  it("includes a precondition's ensure/verify operations, so their executor is registered too", () => {
+    const baselineWithPrecondition = Baseline.parse({
+      ...baseline,
+      id: "BL-WITH-PRECONDITION",
+      preconditions: ["queue.empty"],
+    });
+    const testCase = caseWith("TC-PRECONDITION", { baseline: "BL-WITH-PRECONDITION" });
+    const outcome = planGeneration(
+      suiteWith({ baselines: [baseline, baselineWithPrecondition], cases: [testCase] }),
+      manifest,
+      "TC-PRECONDITION",
+      "typescript",
+    );
+    expectOk(outcome);
+    const plan = outcome.plan;
+    if (plan.kind !== "case") throw new Error("expected a case plan");
+    expect(operationsTouched(plan, manifest)).toEqual(
+      expect.arrayContaining(["OP-SEND", "OP-COUNT"]),
+    );
+    expect(executorKindsFor(plan, manifest)).toEqual(expect.arrayContaining(["http", "shell"]));
   });
 
   it("generates a plan for a scenario, and refuses one touching sql", () => {
