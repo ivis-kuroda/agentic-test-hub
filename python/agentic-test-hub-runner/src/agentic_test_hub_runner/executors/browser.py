@@ -55,6 +55,7 @@ class BrowserDriver(Protocol):
 class _PlaywrightSession:
     """A session backed by one Playwright page (sync API)."""
 
+    playwright: Any
     browser: Any
     context: Any
     page: Any
@@ -131,6 +132,13 @@ class _PlaywrightSession:
     def close(self) -> None:
         self.context.close()
         self.browser.close()
+        # sync_playwright()'s own event loop stays marked "running" (it pumps
+        # a dispatcher greenlet across the whole session, not just one call)
+        # until this stop() runs — skip it and the *next* sync_playwright()
+        # call in the same process finds that stale running loop and refuses
+        # to start with "Please use the Async API instead", even though
+        # nothing here ever touches asyncio directly.
+        self.playwright.stop()
 
 
 @dataclass(frozen=True)
@@ -162,7 +170,9 @@ class PlaywrightDriver:
         context = browser.new_context(**context_kwargs)
         page = context.new_page()
         page.set_default_timeout(self._options.default_timeout_ms)
-        return _PlaywrightSession(browser=browser, context=context, page=page)
+        return _PlaywrightSession(
+            playwright=playwright, browser=browser, context=context, page=page
+        )
 
 
 def _apply_step(session: BrowserSession, step: dict[str, Any]) -> None:
