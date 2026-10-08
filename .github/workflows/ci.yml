@@ -133,6 +133,23 @@ jobs:
       # Node jobs above have to (a runner falling back to an older major).
       - run: uv sync --locked
 
+      # The evidence tests generate a test with the real ath-generate-test
+      # CLI (node, from the workspace) and run it against a throwaway server
+      # and a real Chromium; they skip themselves when either is missing, so
+      # these steps are what makes them run in CI.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Install the browser
+        run: uv run playwright install --with-deps chromium
+
       - name: Formatting
         run: uv run ruff format --check .
 
