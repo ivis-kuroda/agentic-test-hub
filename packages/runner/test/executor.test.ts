@@ -116,6 +116,35 @@ describe("HttpExecutor", () => {
     expect(JSON.parse(body as string)).toEqual({ channel: "sms" });
   });
 
+  it("omits a header that references an absent optional parameter", async () => {
+    const fetchFn = recordingFetch();
+    const registry = registryWith(new HttpExecutor(fetchFn));
+    await registry.run("OP-SEND-AUTH", { channel: "email" }, contextFor());
+    const headers = fetchFn.calls[0]?.init.headers as Record<string, string>;
+    expect(headers).not.toHaveProperty("Authorization");
+    expect(headers).toHaveProperty("Accept", "application/json");
+  });
+
+  it("sends that header when the optional parameter is present", async () => {
+    const fetchFn = recordingFetch();
+    const registry = registryWith(new HttpExecutor(fetchFn));
+    await registry.run("OP-SEND-AUTH", { channel: "email", token: "t1" }, contextFor());
+    expect(fetchFn.calls[0]?.init.headers).toMatchObject({ Authorization: "Bearer t1" });
+  });
+
+  it("reports response headers with lower-cased names", async () => {
+    const registry = registryWith(
+      new HttpExecutor(recordingFetch({ headers: { Location: "/notifications/9" } })),
+    );
+    const result = await registry.run("OP-SEND", { channel: "email" }, contextFor());
+    expect(result.headers).toMatchObject({ location: "/notifications/9" });
+  });
+
+  it("refuses multipart operations, which only the Python runtime sends", async () => {
+    const registry = registryWith(new HttpExecutor(recordingFetch()));
+    await expect(registry.run("OP-UPLOAD", {}, contextFor())).rejects.toThrow(/multipart/);
+  });
+
   it("treats a rejection as a completed operation, since cases expect them", async () => {
     const registry = registryWith(new HttpExecutor(recordingFetch({ status: 401 })));
     const result = await registry.run("OP-SEND", { channel: "email" }, contextFor());
@@ -189,6 +218,7 @@ describe("SqlExecutor", () => {
             connection: "api",
             query: "select 1",
             params: [],
+            optionalParams: [],
             timeoutMs: 1000,
           },
         },

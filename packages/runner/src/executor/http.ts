@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 
-import { renderDeep } from "@agentic-test-hub/plugin";
+import { collectPlaceholders, renderDeep } from "@agentic-test-hub/plugin";
 import type { Operation } from "@agentic-test-hub/plugin";
 
 import {
@@ -36,6 +36,34 @@ async function readBody(response: Response): Promise<{ body: unknown; text: stri
   }
 }
 
+/**
+ * Reports whether a template names an optional parameter that is absent.
+ *
+ * Such a header is left out of the request instead of failing the render.
+ */
+function referencesAbsentOptional(
+  template: string,
+  operation: Extract<Operation, { executor: "http" }>,
+  context: ExecutionContext,
+): boolean {
+  const optional = new Set(operation.optionalParams);
+  return collectPlaceholders(template).some((placeholder) => {
+    if (!placeholder.startsWith("param.")) return false;
+    const name = placeholder.slice("param.".length).split(".")[0] as string;
+    const value = context.scopes.param?.[name];
+    return optional.has(name) && (value === undefined || value === null);
+  });
+}
+
+/** Response headers with lower-cased names. */
+function headersOf(response: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, name) => {
+    headers[name.toLowerCase()] = value;
+  });
+  return headers;
+}
+
 /** Runs `http` operations. */
 export class HttpExecutor implements Executor<"http"> {
   readonly kind = "http" as const;
@@ -61,11 +89,23 @@ export class HttpExecutor implements Executor<"http"> {
       );
     }
 
+    if (operation.multipart !== undefined) {
+      throw new ExecutorError(
+        "multipart bodies are not supported by the TypeScript runner; generate this test as Python",
+        operation.connection,
+      );
+    }
+
+    const sentHeaders = Object.fromEntries(
+      Object.entries({ ...connection.headers, ...operation.headers }).filter(
+        ([, value]) => !referencesAbsentOptional(value, operation, context),
+      ),
+    );
     const rendered = renderDeep(
       {
         baseUrl: connection.baseUrl,
         path: operation.path,
-        headers: { ...connection.headers, ...operation.headers },
+        headers: sentHeaders,
         body: operation.body,
       },
       context.scopes,
@@ -104,6 +144,7 @@ export class HttpExecutor implements Executor<"http"> {
         ok: true,
         durationMs: Date.now() - started,
         status: response.status,
+        headers: headersOf(response),
         body,
         stdout: text,
       };

@@ -155,3 +155,43 @@ describe("checkIntegrity", () => {
     expect(checkIntegrity(broken)).toHaveLength(2);
   });
 });
+
+describe("http multipart and optionalParams", () => {
+  const manifestWith = (operation: string): string => `
+apiVersion: "1"
+name: upload-service
+connections:
+  api: { kind: http, baseUrl: "https://api.invalid" }
+operations:
+  OP-UP:
+    executor: http
+    connection: api
+    method: POST
+    path: /files
+${operation}
+`;
+
+  it("accepts file and value parts and defaults optionalParams to empty", () => {
+    const { manifest } = loadManifest(
+      manifestWith(`    multipart:
+      - { name: file, file: "fixtures/{{param.name}}", filename: "" }
+      - { name: note, value: "hi", contentType: text/plain }`),
+    );
+    expect(manifest.operations["OP-UP"]).toMatchObject({ optionalParams: [] });
+  });
+
+  it("rejects a part with neither or both of file and value", () => {
+    expect(() => loadManifest(manifestWith("    multipart:\n      - { name: a }"))).toThrow();
+    expect(() =>
+      loadManifest(manifestWith("    multipart:\n      - { name: a, file: x, value: y }")),
+    ).toThrow();
+  });
+
+  it("rejects multipart combined with a body", () => {
+    expect(() =>
+      loadManifest(
+        manifestWith("    body: { a: 1 }\n    multipart:\n      - { name: a, value: y }"),
+      ),
+    ).toThrow();
+  });
+});

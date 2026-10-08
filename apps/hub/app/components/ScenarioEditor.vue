@@ -7,8 +7,8 @@ import type { ExpectationDraft } from "~/utils/expectationDraft.ts";
  * A step's `action` is optional (a step may only observe) and, when
  * present, is an operation plus JSON params — the same shape as a
  * baseline's action, edited the same way (see BaselineEditor.vue).
- * `produces` is a `Record<string, string>` in the schema (a name mapped to
- * an extraction expression); edited as a list of pairs, like a matrix
+ * `produces` is a record in the schema (a name mapped to a path, or to a
+ * path plus a pattern); edited as a list of pairs, like a matrix
  * exclusion's `when`.
  */
 export interface StepDraft {
@@ -21,7 +21,7 @@ export interface StepDraft {
   expect: ExpectationDraft[];
   polarity: "nominal" | "error";
   dependsOn: string[];
-  produces: { name: string; expression: string }[];
+  produces: { name: string; expression: string; pattern: string }[];
   viewpoints: string[];
   note: string;
 }
@@ -96,7 +96,7 @@ function removeDependsOn(step: StepDraft, index: number): void {
 }
 
 function addProduces(step: StepDraft): void {
-  step.produces.push({ name: "", expression: "" });
+  step.produces.push({ name: "", expression: "", pattern: "" });
 }
 function removeProduces(step: StepDraft, index: number): void {
   step.produces.splice(index, 1);
@@ -383,7 +383,12 @@ function removeTag(index: number): void {
                 <UInput v-model="produced.name" placeholder="itemTypeId" class="w-40 shrink-0" />
                 <UInput
                   v-model="produced.expression"
-                  placeholder="extraction expression"
+                  placeholder="path in the result, e.g. body.id"
+                  class="flex-1"
+                />
+                <UInput
+                  v-model="produced.pattern"
+                  placeholder="pattern with one group (optional)"
                   class="flex-1"
                 />
                 <UButton

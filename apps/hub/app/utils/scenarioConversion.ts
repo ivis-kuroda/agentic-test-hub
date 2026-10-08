@@ -53,7 +53,11 @@ function stepDraftFromEntity(step: Step): StepDraft {
     expect: step.expect.map(expectationDraftFromEntity),
     polarity: step.polarity,
     dependsOn: [...step.dependsOn],
-    produces: Object.entries(step.produces).map(([name, expression]) => ({ name, expression })),
+    produces: Object.entries(step.produces).map(([name, production]) =>
+      typeof production === "string"
+        ? { name, expression: production, pattern: "" }
+        : { name, expression: production.from, pattern: production.pattern },
+    ),
     viewpoints: [...step.viewpoints],
     note: step.note ?? "",
   };
@@ -99,7 +103,14 @@ function stepDraftToEntity(step: StepDraft): unknown {
     expect: step.expect.map(expectationToEntity),
     polarity: step.polarity,
     dependsOn: step.dependsOn,
-    produces: Object.fromEntries(step.produces.map((entry) => [entry.name, entry.expression])),
+    produces: Object.fromEntries(
+      step.produces.map((entry) => [
+        entry.name,
+        entry.pattern === ""
+          ? entry.expression
+          : { from: entry.expression, pattern: entry.pattern },
+      ]),
+    ),
     viewpoints: step.viewpoints,
     ...(step.note === "" ? {} : { note: step.note }),
   };

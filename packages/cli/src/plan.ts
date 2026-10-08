@@ -169,6 +169,46 @@ function refuseIfUnsupportedExecutor(
   );
 }
 
+/**
+ * Describes every feature a plan uses that only the Python runtime
+ * implements, so TypeScript generation can refuse instead of emitting a test
+ * that fails at run time.
+ *
+ * Currently: operations with `multipart` bodies. The TypeScript HTTP
+ * executor sends only JSON/text bodies; Python's httpx-based one sends
+ * `multipart/form-data`.
+ *
+ * @param plan - The plan to inspect.
+ * @param manifest - The manifest its operations are looked up in.
+ * @returns One human-readable description per feature in use; empty when the
+ *   plan runs on either runtime.
+ */
+export function pythonOnlyFeatures(plan: GenerationPlan, manifest: PluginManifest): string[] {
+  const found: string[] = [];
+  const multipart = operationsTouched(plan, manifest).filter((id) => {
+    const operation = manifest.operations[id];
+    return operation?.executor === "http" && operation.multipart !== undefined;
+  });
+  if (multipart.length > 0) {
+    found.push(`operation(s) ${multipart.join(", ")} send multipart/form-data bodies`);
+  }
+  return found;
+}
+
+/** Refuses TypeScript generation when a plan uses a Python-only feature. */
+function refuseIfPythonOnly(
+  plan: GenerationPlan,
+  manifest: PluginManifest,
+  language: GenerationLanguage,
+): PlanOutcome | undefined {
+  if (language !== "typescript") return undefined;
+  const features = pythonOnlyFeatures(plan, manifest);
+  if (features.length === 0) return undefined;
+  return refuse(
+    `${plan.id} uses features only the Python runtime supports (${features.join("; ")}) — generate it with --lang python`,
+  );
+}
+
 function planCase(
   suite: Suite,
   manifest: PluginManifest,
@@ -218,7 +258,10 @@ function planCase(
     operation,
     params: derivation.params,
   };
-  return refuseIfUnsupportedExecutor(plan, manifest, language) ?? { ok: true, plan };
+  return (
+    refuseIfUnsupportedExecutor(plan, manifest, language) ??
+    refuseIfPythonOnly(plan, manifest, language) ?? { ok: true, plan }
+  );
 }
 
 function planScenario(
@@ -240,7 +283,10 @@ function planScenario(
   }
 
   const plan: ScenarioGenerationPlan = { kind: "scenario", id, scenario };
-  return refuseIfUnsupportedExecutor(plan, manifest, language) ?? { ok: true, plan };
+  return (
+    refuseIfUnsupportedExecutor(plan, manifest, language) ??
+    refuseIfPythonOnly(plan, manifest, language) ?? { ok: true, plan }
+  );
 }
 
 /**

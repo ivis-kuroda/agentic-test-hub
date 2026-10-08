@@ -48,6 +48,26 @@ operations:
     path: /notifications/{{param.id}}
     params: [id]
 
+  OP-SEND-AUTH:
+    executor: http
+    connection: api
+    method: POST
+    path: /notifications
+    params: [channel]
+    optionalParams: [token]
+    headers:
+      Authorization: "Bearer {{param.token}}"
+    body:
+      channel: "{{param.channel}}"
+
+  OP-UPLOAD:
+    executor: http
+    connection: api
+    method: POST
+    path: /files
+    multipart:
+      - { name: file, file: fixtures/a.txt }
+
   OP-COUNT-QUEUED:
     executor: sql
     connection: primary-db

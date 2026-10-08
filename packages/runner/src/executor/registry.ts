@@ -61,8 +61,10 @@ export class ExecutorRegistry {
       );
     }
 
-    const declared = new Set(operation.params);
-    const missing = [...declared].filter((name) => !Object.hasOwn(params, name));
+    const optional = new Set(operation.optionalParams);
+    const missing = [...new Set(operation.params)].filter(
+      (name) => !optional.has(name) && !Object.hasOwn(params, name),
+    );
     if (missing.length > 0) {
       // Caught here rather than left to interpolation, so the message names
       // the operation and every missing argument at once.

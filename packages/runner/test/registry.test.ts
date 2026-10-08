@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { HttpExecutor } from "../src/executor/http.ts";
 import { ShellExecutor } from "../src/executor/shell.ts";
 import { ExecutorError } from "../src/executor/types.ts";
-import { contextFor, recordingSpawn, registryWith } from "./harness.ts";
+import { contextFor, recordingFetch, recordingSpawn, registryWith } from "./harness.ts";
 
 describe("ExecutorRegistry", () => {
   it("reports which kinds it can run", () => {
@@ -51,5 +52,12 @@ describe("ExecutorRegistry", () => {
     const registry = registryWith(new ShellExecutor(first), new ShellExecutor(second));
     const result = await registry.run("OP-DRAIN", {}, contextFor());
     expect(result.stdout).toBe("second");
+  });
+
+  it("does not require an optional parameter", async () => {
+    const registry = registryWith(new HttpExecutor(recordingFetch()));
+    const result = await registry.run("OP-SEND-AUTH", { channel: "email" }, contextFor());
+    expect(result.ok).toBe(true);
+    await expect(registry.run("OP-SEND-AUTH", {}, contextFor())).rejects.toThrow(/needs channel/);
   });
 });

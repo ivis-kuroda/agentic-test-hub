@@ -1,4 +1,4 @@
-import { deepEqual, getAtPath, type Assertion, type Resolved } from "@agentic-test-hub/core";
+import { ABSENT, deepEqual, type Assertion, type Resolved } from "@agentic-test-hub/core";
 
 import type { ExecutionResult } from "./executor/types.ts";
 
@@ -60,7 +60,8 @@ export function subjectOf(result: ExecutionResult): { value: unknown; from: stri
  * The one reader behind both an assertion's `at` and a scenario step's
  * `produces`, so the two always agree on what a path means. Response header
  * names are stored lower-cased, so the segment after `headers` is lower-cased
- * before the lookup.
+ * before the lookup. A numeric segment indexes into an array
+ * (`body.errors.0.message`).
  *
  * @param result - What an operation produced.
  * @param path - Dotted path such as `body.error` or `headers.location`.
@@ -71,7 +72,20 @@ export function getResultAtPath(result: ExecutionResult, path: string): Resolved
   if (segments[0] === "headers" && segments[1] !== undefined) {
     segments[1] = segments[1].toLowerCase();
   }
-  return getAtPath(result, segments.join("."));
+  let current: unknown = result;
+  for (const segment of segments) {
+    if (Array.isArray(current) && /^\d+$/.test(segment)) {
+      const index = Number(segment);
+      if (index >= current.length) return ABSENT;
+      current = current[index];
+    } else if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+      if (!(segment in current)) return ABSENT;
+      current = (current as Record<string, unknown>)[segment];
+    } else {
+      return ABSENT;
+    }
+  }
+  return { present: true, value: current };
 }
 
 type Subject = { ok: true; value: unknown; from: string } | { ok: false; why: string };

@@ -8,6 +8,7 @@ this module needs no generation-time-resolved input at all.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -39,6 +40,21 @@ _DEFAULT_EVIDENCE_PLAN = {
     ],
     "timing": "after",
 }
+
+
+def _extract(action: ExecutionResult, production: str | dict[str, str]) -> tuple[bool, Any]:
+    """Evaluates one `produces` entry: a dotted path, or `{from, pattern}`
+    taking group 1 of the pattern from the path's value. A pattern that does
+    not match (or has no group 1) produces nothing."""
+    if isinstance(production, str):
+        return get_result_at_path(action, production)
+    present, value = get_result_at_path(action, production["from"])
+    if not present or not isinstance(value, (str, int, float)) or isinstance(value, bool):
+        return False, None
+    match = re.search(production["pattern"], str(value))
+    if match is None or match.lastindex is None or match.group(1) is None:
+        return False, None
+    return True, match.group(1)
 
 
 @dataclass(frozen=True)
@@ -76,8 +92,8 @@ def run_step(
         )
 
     produced: dict[str, Any] = {}
-    for name, path in step.get("produces", {}).items():
-        present, value = get_result_at_path(action, path)
+    for name, production in step.get("produces", {}).items():
+        present, value = _extract(action, production)
         if present:
             produced[name] = value
 

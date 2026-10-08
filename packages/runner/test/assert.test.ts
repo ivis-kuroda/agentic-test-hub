@@ -202,6 +202,16 @@ describe("checkAssertion with `at` and the extended kinds", () => {
     ).toBe("satisfied");
   });
 
+  it("indexes into arrays with a numeric segment", () => {
+    const body = { errors: [{ message: "first" }, { message: "second" }] };
+    expect(
+      verdictOf({ kind: "equals", at: "body.errors.1.message", value: "second" }, { body }),
+    ).toBe("satisfied");
+    expect(verdictOf({ kind: "equals", at: "body.errors.2.message", value: "x" }, { body })).toBe(
+      "violated",
+    );
+  });
+
   it("keys compares the key set, ignoring order", () => {
     const body = { a: 1, b: 2 };
     expect(verdictOf({ kind: "keys", value: ["b", "a"] }, { body })).toBe("satisfied");

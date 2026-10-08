@@ -7,6 +7,29 @@ import { Expectation } from "./expectation.ts";
 import { ScenarioId, StateRef, StepId } from "./id.ts";
 
 /**
+ * How a step extracts a value from its own result: a dotted path, or a path
+ * plus a regular expression whose first capture group is the value.
+ */
+export const Production = z.union([
+  z.string().min(1),
+  z.object({
+    from: z.string().min(1),
+    pattern: z.string().min(1).refine(isRegExp, { message: "not a valid regular expression" }),
+  }),
+]);
+/** How a step extracts a value from its own result. */
+export type Production = z.infer<typeof Production>;
+
+function isRegExp(pattern: string): boolean {
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * One judged action within a scenario.
  *
  * A step, not a scenario, is the unit of verdict. That follows the
@@ -41,8 +64,13 @@ export const Step = z.object({
    *
    * This is the other half of the prose problem: a later step referring to
    * "the item type created earlier" needs the identifier, not the sentence.
+   *
+   * An entry is either a dotted path into the step's result (`body.id`) or
+   * `{from, pattern}`: read the path, then take the first capture group of
+   * `pattern` from it — for an identifier at the tail of a `Location` header,
+   * say.
    */
-  produces: z.record(z.string(), z.string()).default({}),
+  produces: z.record(z.string(), Production).default({}),
   ...traceableFields,
 });
 /** One judged action within a scenario. */

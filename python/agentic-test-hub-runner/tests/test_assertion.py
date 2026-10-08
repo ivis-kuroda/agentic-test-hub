@@ -94,6 +94,16 @@ def _res(**kwargs) -> ExecutionResult:
             _res(body={"id": 42}),
             "satisfied",
         ),
+        (
+            {"kind": "equals", "at": "body.e.1.m", "value": "b"},
+            _res(body={"e": [{"m": "a"}, {"m": "b"}]}),
+            "satisfied",
+        ),
+        (
+            {"kind": "equals", "at": "body.e.2.m", "value": "b"},
+            _res(body={"e": [{"m": "a"}]}),
+            "violated",
+        ),
         ({"kind": "keys", "value": ["b", "a"]}, _res(body={"a": 1, "b": 2}), "satisfied"),
         ({"kind": "keys", "value": ["a"]}, _res(body={"a": 1, "b": 2}), "violated"),
         ({"kind": "keys", "value": ["a", "b"]}, _res(body={"a": 1}), "violated"),

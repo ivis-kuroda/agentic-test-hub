@@ -132,6 +132,37 @@ describe("runStep", () => {
   });
 });
 
+describe("runStep produces with a pattern", () => {
+  const locationFetch = (async () =>
+    new Response("", {
+      status: 201,
+      headers: { Location: "https://api.invalid/v1/records/4711" },
+    })) as typeof fetch;
+  const stepProducing = (produces: Record<string, unknown>) =>
+    scenarioWith({}).steps[0] && {
+      ...scenarioWith({}).steps[0]!,
+      produces: produces as never,
+    };
+
+  it("takes the first capture group from a header read through the same path reader", async () => {
+    const registry = registryWith(new HttpExecutor(locationFetch));
+    const step = stepProducing({
+      recid: { from: "headers.location", pattern: "/records/(\\d+)$" },
+      plain: "headers.location",
+    })!;
+    const result = await runStep(step, registry, context);
+    expect(result.produced["recid"]).toBe("4711");
+    expect(result.produced["plain"]).toBe("https://api.invalid/v1/records/4711");
+  });
+
+  it("produces nothing when the pattern does not match", async () => {
+    const registry = registryWith(new HttpExecutor(locationFetch));
+    const step = stepProducing({ recid: { from: "headers.location", pattern: "/zzz/(\\d+)" } })!;
+    const result = await runStep(step, registry, context);
+    expect(result.produced).toEqual({});
+  });
+});
+
 describe("runScenario", () => {
   it("threads a produced value from one step into a later step's scope", async () => {
     const registry = registryWith(new HttpExecutor(sequencedFetch()));

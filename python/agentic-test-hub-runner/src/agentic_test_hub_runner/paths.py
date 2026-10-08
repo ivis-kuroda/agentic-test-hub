@@ -28,7 +28,8 @@ def get_result_at_path(result: ExecutionResult, path: str) -> tuple[bool, Any]:
     The first segment names an `ExecutionResult` field and may be written in
     camelCase (`durationMs`, as in YAML) or snake_case (`duration_ms`). Later
     segments are plain mapping keys; the one after `headers` is lower-cased,
-    since response header names are stored lower-cased.
+    since response header names are stored lower-cased. A numeric segment
+    indexes into a list (`body.errors.0.message`).
 
     @returns `(present, value)`; `present` is False when any segment is missing.
     """
@@ -40,7 +41,12 @@ def get_result_at_path(result: ExecutionResult, path: str) -> tuple[bool, Any]:
     if field_name == "headers" and rest:
         rest[0] = rest[0].lower()
     for segment in rest:
-        if not isinstance(current, dict) or segment not in current:
+        if isinstance(current, list) and segment.isdigit():
+            if int(segment) >= len(current):
+                return _ABSENT
+            current = current[int(segment)]
+        elif isinstance(current, dict) and segment in current:
+            current = current[segment]
+        else:
             return _ABSENT
-        current = current[segment]
     return True, current

@@ -1,5 +1,5 @@
+import { acceptedParams, type Operation } from "@agentic-test-hub/plugin";
 import type { Override, ResolvedBaseline } from "@agentic-test-hub/core";
-import type { Operation } from "@agentic-test-hub/plugin";
 
 /** One override that cannot mechanically reach the operation it targets. */
 export interface UnexpressibleOverride {
@@ -58,11 +58,19 @@ export function deriveActionParams(
   operation: Operation,
 ): ParamDerivation {
   const params: Record<string, unknown> = { ...resolved.action?.params };
+  const accepted = acceptedParams(operation);
+  // A parameter a case removed from the action on purpose ("this header is
+  // not sent") must stay absent, not be re-derived from the baseline context.
+  const removed = new Set(
+    overrides
+      .filter((override) => override.op === "remove" && override.path.startsWith("action.params."))
+      .map((override) => override.path.slice("action.params.".length)),
+  );
   const ambiguous = new Set<string>();
   const body = isRecord(resolved.context["body"]) ? resolved.context["body"] : undefined;
 
-  for (const name of operation.params) {
-    if (Object.hasOwn(params, name)) continue;
+  for (const name of accepted) {
+    if (Object.hasOwn(params, name) || removed.has(name)) continue;
 
     const hasDirect = Object.hasOwn(resolved.context, name);
     const hasBody = body !== undefined && Object.hasOwn(body, name);
@@ -94,7 +102,16 @@ export function deriveActionParams(
         });
         continue;
       }
-      if (operation.params.includes(name) && Object.hasOwn(params, name)) continue;
+      if (accepted.includes(name) && Object.hasOwn(params, name)) continue;
+      // Removing a value an operation takes as an optional parameter is how a
+      // case says "this is not sent"; the parameter simply stays absent.
+      if (
+        override.op === "remove" &&
+        operation.optionalParams.includes(name) &&
+        !Object.hasOwn(params, name)
+      ) {
+        continue;
+      }
       unexpressible.push({
         path: override.path,
         why: `operation ${operationId} declares no param named "${name}", so nothing reads it`,

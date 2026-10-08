@@ -52,7 +52,8 @@ class ExecutorRegistry:
             )
 
         declared: list[str] = operation.get("params", [])
-        missing = [name for name in declared if name not in params]
+        optional = set(operation.get("optionalParams", []))
+        missing = [name for name in declared if name not in optional and name not in params]
         if missing:
             raise ExecutorError(
                 f"operation {operation_id} needs {', '.join(missing)}", operation_id

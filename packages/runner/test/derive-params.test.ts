@@ -107,4 +107,46 @@ describe("deriveActionParams", () => {
     expect(derivation.ok).toBe(true);
     expect(derivation.params["channel"]).toBe("email");
   });
+
+  describe("optional parameters", () => {
+    const opAuth = manifest.operations["OP-SEND-AUTH"]!; // optionalParams: [token]
+    const withAction = (params: Record<string, unknown>, context = {}) =>
+      resolved({ context, action: { operation: "OP-SEND-AUTH", params } });
+
+    it("keeps an optional param the baseline action supplies", () => {
+      const derivation = deriveActionParams(
+        [],
+        withAction({ channel: "email", token: "t1" }),
+        "OP-SEND-AUTH",
+        opAuth,
+      );
+      expect(derivation.params).toEqual({ channel: "email", token: "t1" });
+    });
+
+    it("expresses an action.params removal as the param staying absent", () => {
+      const override: Override = { path: "action.params.token", op: "remove" };
+      // The baseline action had a token; the override removed it, and a
+      // same-named context value must not bring it back.
+      const derivation = deriveActionParams(
+        [override],
+        withAction({ channel: "email" }, { token: "from-context" }),
+        "OP-SEND-AUTH",
+        opAuth,
+      );
+      expect(derivation.ok).toBe(true);
+      expect(derivation.params).toEqual({ channel: "email" });
+    });
+
+    it("expresses a context removal of an optional param as expressible", () => {
+      const override: Override = { path: "context.token", op: "remove" };
+      const derivation = deriveActionParams(
+        [override],
+        withAction({ channel: "email" }),
+        "OP-SEND-AUTH",
+        opAuth,
+      );
+      expect(derivation.ok).toBe(true);
+      expect(derivation.params).not.toHaveProperty("token");
+    });
+  });
 });

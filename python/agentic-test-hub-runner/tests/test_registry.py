@@ -29,3 +29,34 @@ def test_raises_when_a_declared_param_is_missing(context, registry_with, sequenc
     registry = registry_with(sequenced_fetch(201, ""))
     with pytest.raises(ExecutorError, match="channel"):
         registry.run("OP-SEND", {}, context)
+
+
+def test_an_optional_param_is_not_required() -> None:
+    from agentic_test_hub_runner import ExecutionContext, ExecutorRegistry, Manifest
+
+    class Recorder:
+        kind = "http"
+
+        def run(self, operation, context):
+            from agentic_test_hub_runner import ExecutionResult
+
+            return ExecutionResult(operation="x", ok=True, duration_ms=0)
+
+    manifest = Manifest(
+        name="x",
+        connections={},
+        operations={
+            "OP": {"executor": "http", "params": ["a", "b"], "optionalParams": ["b", "c"]},
+        },
+        states={},
+        evidence={},
+        policy=None,
+        extension_module=None,
+    )
+    registry = ExecutorRegistry().register(Recorder())
+    context = ExecutionContext(manifest=manifest)
+    assert registry.run("OP", {"a": 1}, context).ok
+    import pytest
+
+    with pytest.raises(Exception, match="needs a"):
+        registry.run("OP", {}, context)

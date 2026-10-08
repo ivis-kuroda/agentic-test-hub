@@ -24,6 +24,26 @@ import type { ExecutionContext, ExecutionResult } from "./executor/types.ts";
 /** Stands in for a step with no action, so expectations still have something to check. */
 const NO_ACTION: ExecutionResult = { operation: "(none)", ok: true, durationMs: 0 };
 
+/**
+ * Evaluates one `produces` entry: a dotted path, or a path plus a pattern
+ * whose first capture group is taken. A pattern that does not match, or has
+ * no group 1, produces nothing — a later `{{step.name}}` then fails loudly.
+ */
+function extract(
+  action: ExecutionResult,
+  production: Step["produces"][string],
+): { present: true; value: unknown } | { present: false } {
+  if (typeof production === "string") return getResultAtPath(action, production);
+  const read = getResultAtPath(action, production.from);
+  const raw = read.present ? read.value : undefined;
+  if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
+    return { present: false };
+  }
+  const match = new RegExp(production.pattern).exec(String(raw));
+  const captured = match?.[1];
+  return captured === undefined ? { present: false } : { present: true, value: captured };
+}
+
 /** What running one step established. */
 export interface StepRunResult {
   readonly stepId: string;
@@ -73,9 +93,9 @@ export async function runStep(
   }
 
   const produced: Record<string, unknown> = {};
-  for (const [name, path] of Object.entries(step.produces)) {
-    const value = getResultAtPath(action, path);
-    if (value.present) produced[name] = value.value;
+  for (const [name, production] of Object.entries(step.produces)) {
+    const extracted = extract(action, production);
+    if (extracted.present) produced[name] = extracted.value;
   }
 
   return {

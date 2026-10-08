@@ -187,6 +187,27 @@ accepts the camelCase names from YAML and maps them to snake_case.
 - `compare`: `op` (`lt|lte|gt|gte`) against a number; the subject is coerced.
 - `http_status.alsoAccepts`: further statuses that also satisfy it.
 
+## What an `http` operation can send and report
+
+- `optionalParams: [name, ...]` lists parameters a caller may leave out. The
+  registry does not require them, and a header or multipart part whose
+  template references an absent optional parameter is omitted from the
+  request (an absent parameter from `params` still fails the run). A case
+  expresses "this header is not sent" with `op: remove` on
+  `action.params.<name>`; the removal is never undone by a same-named value
+  in the baseline `context`.
+- `multipart: [{name, file?, value?, filename?, contentType?}]` sends
+  `multipart/form-data`; exactly one of `file` (a template, relative to the
+  plugin root) or `value` per part. `filename` defaults to the file's
+  basename and may be `""`. It excludes `body`/`bodyFile`, and the library
+  sets the boundary `Content-Type`, so a configured one is ignored. Python
+  only: `ath-generate-test --lang typescript` refuses plans that use it
+  (`pythonOnlyFeatures` in `packages/cli/src/plan.ts`).
+- `ExecutionResult.headers` holds response headers with lower-cased names.
+  A step's `produces` entry is a dotted path or `{from, pattern}`, taking
+  capture group 1 of `pattern` from the path's value (an identifier at the
+  tail of a `Location` header, say).
+
 ## AI at authoring time, deterministic code at run time
 
 Running an agent for every test execution is slow, expensive and

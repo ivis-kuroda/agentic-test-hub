@@ -43,6 +43,28 @@ operations:
     body:
       channel: "{{param.channel}}"
 
+  OP-SEND-AUTH:
+    executor: http
+    connection: api
+    method: POST
+    path: /notifications
+    params: [channel]
+    optionalParams: [token]
+    headers:
+      Authorization: "Bearer {{param.token}}"
+    body:
+      channel: "{{param.channel}}"
+
+  OP-UPLOAD:
+    executor: http
+    connection: api
+    method: POST
+    path: /files
+    params: [title]
+    multipart:
+      - { name: file, file: fixtures/a.txt }
+      - { name: title, value: "{{param.title}}" }
+
   OP-SEED-DB:
     executor: sql
     connection: postgres
@@ -179,6 +201,46 @@ describe("planGeneration", () => {
 
     const py = planGeneration(suiteWith({ cases: [testCase] }), manifest, "TC-EXT", "python");
     expectOk(py);
+  });
+
+  it("plans a case whose override removes an optional param, so the header is not sent", () => {
+    const authBaseline = Baseline.parse({
+      ...baseline,
+      id: "BL-AUTH",
+      context: { body: { channel: "email" } },
+      action: { operation: "OP-SEND-AUTH", params: { token: "t1" } },
+    });
+    const testCase = caseWith("TC-NO-TOKEN", {
+      baseline: "BL-AUTH",
+      overrides: [{ path: "action.params.token", op: "remove" }],
+    });
+    for (const lang of ["typescript", "python"] as const) {
+      const outcome = planGeneration(
+        suiteWith({ baselines: [authBaseline], cases: [testCase] }),
+        manifest,
+        "TC-NO-TOKEN",
+        lang,
+      );
+      expectOk(outcome);
+      const plan = outcome.plan;
+      if (plan.kind !== "case") throw new Error("expected a case plan");
+      expect(plan.params).toEqual({ channel: "email" });
+    }
+  });
+
+  it("refuses typescript generation for a multipart operation, but allows python", () => {
+    const uploadBaseline = Baseline.parse({
+      ...baseline,
+      id: "BL-UPLOAD",
+      action: { operation: "OP-UPLOAD", params: { title: "t" } },
+    });
+    const testCase = caseWith("TC-UP", { baseline: "BL-UPLOAD" });
+    const suite = suiteWith({ baselines: [uploadBaseline], cases: [testCase] });
+    const ts = planGeneration(suite, manifest, "TC-UP", "typescript");
+    expectRefused(ts);
+    expect(ts.refusal.reason).toContain("OP-UPLOAD");
+    expect(ts.refusal.reason).toContain("--lang python");
+    expectOk(planGeneration(suite, manifest, "TC-UP", "python"));
   });
 
   it("includes a precondition's ensure/verify operations, so their executor is registered too", () => {

@@ -109,3 +109,26 @@ def test_inconclusive_when_preconditions_are_not_ready(context, registry_with) -
     assert result.preparation.ready is False
     assert result.steps == []
     assert result.verdict == "inconclusive"
+
+
+def _location_fetch():
+    def request(method, url, **kwargs):
+        return httpx.Response(201, headers={"Location": "https://api.invalid/v1/records/4711"})
+
+    return type("Fetch", (), {"request": staticmethod(request)})()
+
+
+def test_produces_takes_group_one_of_a_pattern_over_a_header(context, registry_with) -> None:
+    registry = registry_with(_location_fetch())
+    step = {
+        **_scenario()["steps"][0],
+        "produces": {
+            "recid": {"from": "headers.location", "pattern": r"/records/(\d+)$"},
+            "plain": "headers.location",
+            "missing": {"from": "headers.location", "pattern": r"/zzz/(\d+)"},
+        },
+    }
+    result = run_step(step, registry, context)
+    assert result.produced["recid"] == "4711"
+    assert result.produced["plain"] == "https://api.invalid/v1/records/4711"
+    assert "missing" not in result.produced
