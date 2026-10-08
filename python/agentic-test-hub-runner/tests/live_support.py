@@ -135,6 +135,26 @@ def cli_available() -> bool:
 requires_cli = pytest.mark.skipif(not cli_available(), reason="node cannot run the real CLI here")
 
 
+def browser_available() -> bool:
+    """Whether Playwright can launch its pinned Chromium here."""
+    try:
+        from playwright.sync_api import sync_playwright
+
+        playwright = sync_playwright().start()
+        try:
+            playwright.chromium.launch().close()
+        finally:
+            playwright.stop()
+    except Exception:
+        return False
+    return True
+
+
+requires_browser = pytest.mark.skipif(
+    not (cli_available() and browser_available()), reason="no CLI or no launchable Chromium"
+)
+
+
 def write_yaml(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data, sort_keys=False))
@@ -182,10 +202,21 @@ def generate(root: Path, specs: Path, plugin: Path, entity_id: str) -> Path:
     return out
 
 
-def run_generated(test_file: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_generated(
+    test_file: Path, env: dict[str, str], verbose: bool = False
+) -> subprocess.CompletedProcess[str]:
     """Runs a generated test with pytest in a subprocess."""
     return subprocess.run(
-        [sys.executable, "-m", "pytest", "-p", "no:anyio", "-q", "-x", str(test_file)],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:anyio",
+            "-vv" if verbose else "-q",
+            "-x",
+            str(test_file),
+        ],
         capture_output=True,
         text=True,
         env={**os.environ, **env},

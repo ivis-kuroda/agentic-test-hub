@@ -8,8 +8,9 @@ Python test ever uses.
 
 from __future__ import annotations
 
+import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
 
 from ..template import render_deep
@@ -29,6 +30,8 @@ class NetworkExchange:
     url: str
     status: int
     failed: bool = False
+    response_body_preview: str | None = None
+    """The first 16 KiB of the response body, kept only for non-GET XHR/fetch calls."""
 
 
 class BrowserSession(Protocol):
@@ -40,6 +43,7 @@ class BrowserSession(Protocol):
     def wait_for(self, selector: str, timeout_ms: int) -> None: ...
     def text_of(self, selector: str) -> str | None: ...
     def screenshot(self) -> bytes: ...
+    def current_url(self) -> str: ...
     def console_messages(self) -> list[ConsoleMessage]: ...
     def network_exchanges(self) -> list[NetworkExchange]: ...
     def close(self) -> None: ...
@@ -49,6 +53,9 @@ class BrowserDriver(Protocol):
     """Opens browser sessions. Injected so tests need no real browser."""
 
     def open(self, base_url: str) -> BrowserSession: ...
+
+
+PREVIEW_LIMIT = 16 * 1024
 
 
 @dataclass
@@ -61,6 +68,7 @@ class _PlaywrightSession:
     page: Any
     _console: list[ConsoleMessage] = field(default_factory=list)
     _network: list[NetworkExchange] = field(default_factory=list)
+    _closed: bool = False
 
     def __post_init__(self) -> None:
         self.page.on("console", self._on_console)
@@ -87,9 +95,19 @@ class _PlaywrightSession:
         self._console.append(ConsoleMessage(level=level, text=message.text, location=where))
 
     def _on_response(self, response: Any) -> None:
+        request = response.request
+        preview: str | None = None
+        if request.method != "GET" and request.resource_type in ("xhr", "fetch"):
+            try:
+                preview = response.body()[:PREVIEW_LIMIT].decode("utf8", errors="replace")
+            except Exception:  # a redirect or an already-closed page has no body to read
+                preview = None
         self._network.append(
             NetworkExchange(
-                method=response.request.method, url=response.url, status=response.status
+                method=request.method,
+                url=response.url,
+                status=response.status,
+                response_body_preview=preview,
             )
         )
 
@@ -123,6 +141,9 @@ class _PlaywrightSession:
     def screenshot(self) -> bytes:
         return self.page.screenshot()
 
+    def current_url(self) -> str:
+        return self.page.url
+
     def console_messages(self) -> list[ConsoleMessage]:
         return self._console
 
@@ -130,6 +151,9 @@ class _PlaywrightSession:
         return self._network
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         self.context.close()
         self.browser.close()
         # sync_playwright()'s own event loop stays marked "running" (it pumps
@@ -193,16 +217,100 @@ def _apply_step(session: BrowserSession, step: dict[str, Any]) -> None:
         raise ValueError(f"unknown browser step action: {action}")
 
 
+def _has_page(session: BrowserSession) -> bool:
+    """Whether a session already shows a page (sessions that cannot say count as blank)."""
+    probe = getattr(session, "current_url", None)
+    try:
+        return callable(probe) and probe() not in ("", "about:blank")
+    except Exception:
+        return False
+
+
+class _OperationEvidence:
+    """Saves one browser operation's evidence: a screenshot before and after,
+    and the full console and network logs. Every failure becomes a warning."""
+
+    def __init__(self, session: BrowserSession, target: Any, name: str) -> None:
+        self._session = session
+        self._target = target
+        self._name = name
+        self._before_done = False
+
+    def _guard(self, what: str, action: Any) -> None:
+        try:
+            action()
+        except Exception as cause:
+            self._target.store.warn(f"could not save {what} for {self._name}: {cause}")
+
+    def _screenshot(self, phase: Any) -> None:
+        self._target.save(
+            phase=phase,
+            source="screenshot",
+            name=self._name,
+            data=self._session.screenshot(),
+            ext="png",
+        )
+
+    def start(self) -> None:
+        """Before shot, when the session already shows a page."""
+        if _has_page(self._session):
+            self._before_done = True
+            self._guard("a before screenshot", lambda: self._screenshot("before"))
+
+    def after_step(self, step: dict[str, Any]) -> None:
+        """A fresh session has no page to show yet, so its before shot is the
+        page as the first navigation left it."""
+        if not self._before_done and step["action"] == "goto":
+            self._before_done = True
+            self._guard("a before screenshot", lambda: self._screenshot("before"))
+
+    def finish(self) -> None:
+        """After shot, then the console and network logs as JSON."""
+        if _has_page(self._session):
+            self._guard("an after screenshot", lambda: self._screenshot("after"))
+        self._guard(
+            "the console log",
+            lambda: self._target.save(
+                phase="after",
+                source="browser_console",
+                name=self._name,
+                data=json.dumps(
+                    [asdict(message) for message in self._session.console_messages()], indent=2
+                ),
+                ext="json",
+            ),
+        )
+        self._guard(
+            "the network log",
+            lambda: self._target.save(
+                phase="after",
+                source="browser_network",
+                name=self._name,
+                data=json.dumps(
+                    [asdict(exchange) for exchange in self._session.network_exchanges()], indent=2
+                ),
+                ext="json",
+            ),
+        )
+
+
 class BrowserExecutor:
     """
     Runs `browser` operations.
 
-    A session is opened per operation and closed afterwards unless one is
-    supplied — supplying one is how a scenario keeps a signed-in page across
-    steps.
+    A session is opened per operation unless one is supplied — supplying one
+    is how a scenario keeps a signed-in page across steps. A session this
+    executor opened stays open after its operation, so the runner can read
+    the browser's console and network (`browser_session()`) when it collects
+    evidence at the end of the run; it is closed when the next operation
+    opens its own, or by `close_all()`, which `run_case`/`run_scenario` call
+    when a run ends (also when a step raised). Closing happens once.
+
+    While an evidence directory is configured each operation saves a
+    screenshot before and after, plus the full console and network logs.
 
     @param driver: Opens sessions when none is supplied.
-    @param session: An existing session to reuse. Not closed by this
+    @param session: An existing session to reuse. Never closed by this
         executor, since its owner may still need it.
     """
 
@@ -211,6 +319,31 @@ class BrowserExecutor:
     def __init__(self, driver: BrowserDriver, session: BrowserSession | None = None) -> None:
         self._driver = driver
         self._session = session
+        self._owned: BrowserSession | None = None
+
+    def browser_session(self) -> BrowserSession | None:
+        """The session whose console and network the runner reads as evidence:
+        the supplied one, else the last one this executor opened."""
+        return self._session or self._owned
+
+    def close_all(self) -> None:
+        """Closes the session this executor opened, if still open. Idempotent."""
+        owned, self._owned = self._owned, None
+        if owned is not None:
+            owned.close()
+
+    def __enter__(self) -> BrowserExecutor:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close_all()
+
+    def _open(self, base_url: str) -> BrowserSession:
+        # The previous session must be closed first: Playwright's sync API
+        # refuses to start a second driver while the first is still running.
+        self.close_all()
+        self._owned = self._driver.open(base_url)
+        return self._owned
 
     def run(self, operation: dict[str, Any], context: ExecutionContext) -> ExecutionResult:
         connection = context.manifest.connections.get(operation["connection"])
@@ -223,12 +356,22 @@ class BrowserExecutor:
         base_url = render_deep(connection["baseUrl"], context.scopes)
         steps = render_deep(operation["steps"], context.scopes)
 
-        borrowed = self._session is not None
-        session = self._session or self._driver.open(base_url)
+        session = self._session or self._open(base_url)
+        evidence = (
+            _OperationEvidence(
+                session, context.evidence, operation.get("id", operation["connection"])
+            )
+            if context.evidence is not None
+            else None
+        )
         started = time.monotonic()
         try:
+            if evidence is not None:
+                evidence.start()
             for step in steps:
                 _apply_step(session, step)
+                if evidence is not None:
+                    evidence.after_step(step)
             return ExecutionResult(
                 operation=operation["connection"],
                 ok=True,
@@ -243,5 +386,5 @@ class BrowserExecutor:
                 failure=f"browser step failed: {cause}",
             )
         finally:
-            if not borrowed:
-                session.close()
+            if evidence is not None:
+                evidence.finish()

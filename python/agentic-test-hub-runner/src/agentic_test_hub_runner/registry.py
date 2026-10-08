@@ -62,5 +62,26 @@ class ExecutorRegistry:
         merged_param = {**(context.scopes.get("param") or {}), **params}
         merged_context = replace(context, scopes={**context.scopes, "param": merged_param})
 
-        result = executor.run(operation, merged_context)
+        # Executors that save evidence name their files after the operation id.
+        result = executor.run({**operation, "id": operation_id}, merged_context)
         return replace(result, operation=operation_id)
+
+    def browser_session(self) -> Any | None:
+        """
+        The live browser session an executor is holding for evidence (the last
+        one a `browser` operation opened), or `None`. Never opened here.
+        """
+        for executor in self._executors.values():
+            offer = getattr(executor, "browser_session", None)
+            session = offer() if callable(offer) else None
+            if session is not None:
+                return session
+        return None
+
+    def close_all(self) -> None:
+        """Closes everything executors still hold open (browser sessions).
+        Idempotent; `run_case`/`run_scenario` call it when a run ends."""
+        for executor in self._executors.values():
+            close = getattr(executor, "close_all", None)
+            if callable(close):
+                close()

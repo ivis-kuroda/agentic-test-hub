@@ -24,6 +24,29 @@ PLUGIN: dict[str, Any] = {
         "OP-READ-LOGS": {"executor": "http", "connection": "api", "path": "/logs"},
         "OP-READ-DB-LOG": {"executor": "http", "connection": "api", "path": "/dblog"},
         "OP-LIST": {"executor": "http", "connection": "api", "path": "/notifications"},
+        "OP-OPEN": {
+            "executor": "browser",
+            "connection": "ui",
+            "steps": [
+                {"action": "goto", "url": "{{env.APP_URL}}/"},
+                {"action": "waitFor", "selector": "[data-testid=heading]"},
+            ],
+        },
+        "OP-COMPOSE": {
+            "executor": "browser",
+            "connection": "ui",
+            "params": ["recipient"],
+            "steps": [
+                {"action": "goto", "url": "{{env.APP_URL}}/"},
+                {
+                    "action": "fill",
+                    "selector": "[data-testid=recipient]",
+                    "value": "{{param.recipient}}",
+                },
+                {"action": "click", "selector": "[data-testid=submit]"},
+                {"action": "waitFor", "selector": "text=status 201"},
+            ],
+        },
     },
     "evidence": {
         "app_log": {"operation": "OP-READ-LOGS"},

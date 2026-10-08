@@ -107,6 +107,14 @@ class CaseRunResult:
     """Path of this run's `index.json` when evidence was saved, else `None`."""
 
 
+def with_browser_session(options: RunOptions, registry: ExecutorRegistry) -> RunOptions:
+    """`options` with the session an executor holds for evidence, unless the
+    caller supplied one."""
+    if options.browser_session is not None:
+        return options
+    return replace(options, browser_session=registry.browser_session())
+
+
 def wants_before(plan: dict[str, Any], context: ExecutionContext) -> bool:
     """
     Whether collectors are read before the action as well as after.
@@ -256,7 +264,8 @@ def run_case(
     """
     Runs one already-resolved case: prepares its preconditions, runs its
     action with `action_params`, judges every expectation, collects
-    evidence and reaches an overall verdict.
+    evidence and reaches an overall verdict. Browser sessions the registry's
+    executors opened are closed when it returns or raises.
 
     @param test_case: The case's own data (`id`, `expect`, `polarity`,
         `evidence`, `evidenceWaivers`) — its `overrides`/`baseline` fields,
@@ -268,6 +277,20 @@ def run_case(
     @param action_params: The mechanically-derived params for `resolved`'s
         action, from `deriveActionParams` at generation time.
     """
+    try:
+        return _run_case(test_case, resolved, action_params, registry, context, options)
+    finally:
+        registry.close_all()
+
+
+def _run_case(
+    test_case: dict[str, Any],
+    resolved: dict[str, Any],
+    action_params: dict[str, Any],
+    registry: ExecutorRegistry,
+    context: ExecutionContext,
+    options: RunOptions | None = None,
+) -> CaseRunResult:
     options = options or RunOptions()
     context = with_evidence_target(
         with_run_scope(context), options.evidence_dir, test_case["id"], "case"
@@ -306,7 +329,9 @@ def run_case(
             ExpectationOutcome(expectation, check_expectation(expectation, subject))
         )
 
-    observations = collect_evidence(plan, registry, context, options, before)
+    observations = collect_evidence(
+        plan, registry, context, with_browser_session(options, registry), before
+    )
     waivers = [
         EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
         for waiver in test_case.get("evidenceWaivers", [])

@@ -23,6 +23,7 @@ from .run_case import (
     collect_evidence,
     compose_verdict,
     evidence_index_of,
+    with_browser_session,
     worst_verdict,
 )
 from .run_scope import with_evidence_target, with_run_scope
@@ -132,6 +133,20 @@ def run_scenario(
     context: ExecutionContext,
     options: RunOptions | None = None,
 ) -> ScenarioRunResult:
+    """Runs a scenario (see `_run_scenario`), then closes any browser session
+    the registry's executors opened — also when a step raised."""
+    try:
+        return _run_scenario(scenario, registry, context, options)
+    finally:
+        registry.close_all()
+
+
+def _run_scenario(
+    scenario: dict[str, Any],
+    registry: ExecutorRegistry,
+    context: ExecutionContext,
+    options: RunOptions | None = None,
+) -> ScenarioRunResult:
     """
     Runs a scenario: its preconditions once, then every step in order,
     threading each step's `produces` into the next steps' `context.scopes["step"]`
@@ -168,16 +183,21 @@ def run_scenario(
     cleanup_results: list[StepRunResult] = []
     passed_steps: set[str] = set()
 
-    def step_context() -> ExecutionContext:
-        return replace(
+    def step_context(directory: str | None = None, step_id: str | None = None) -> ExecutionContext:
+        """The context for one step, saving evidence into that step's own
+        directory; with no step it is the scenario-level context."""
+        scoped = replace(
             context,
             scopes={**context.scopes, "step": {**(context.scopes.get("step") or {}), **step_scope}},
         )
+        if directory is None or step_id is None or context.evidence is None:
+            return scoped
+        return replace(scoped, evidence=context.evidence.for_step(directory, step_id))
 
     plan = scenario.get("evidence") or _DEFAULT_EVIDENCE_PLAN
     try:
         before = collect_before(plan, registry, step_context())
-        for step in scenario["steps"]:
+        for number, step in enumerate(scenario["steps"], start=1):
             depends_on = step.get("dependsOn", [])
             unmet = next((dep for dep in depends_on if dep not in passed_steps), None)
             if unmet is not None:
@@ -191,7 +211,9 @@ def run_scenario(
                 )
                 continue
 
-            result = run_step(step, registry, step_context())
+            result = run_step(
+                step, registry, step_context(f"{number:02d}-{step['id']}", step["id"])
+            )
             step_results.append(result)
             if result.verdict == "pass":
                 passed_steps.add(step["id"])
@@ -203,7 +225,9 @@ def run_scenario(
         evidence: VerdictResult | None = None
         if should_collect:
             last_step = scenario["steps"][-1]
-            observations = collect_evidence(plan, registry, step_context(), options, before)
+            observations = collect_evidence(
+                plan, registry, step_context(), with_browser_session(options, registry), before
+            )
             waivers = [
                 EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
                 for waiver in scenario.get("evidenceWaivers", [])
@@ -214,8 +238,11 @@ def run_scenario(
     finally:
         # Runs whether the steps passed, failed or raised; a raise then
         # continues to propagate once the leftovers have been dealt with.
-        for cleanup_step in scenario.get("cleanup", []):
-            cleanup_results.append(_run_cleanup_step(cleanup_step, registry, step_context()))
+        for number, cleanup_step in enumerate(scenario.get("cleanup", []), start=1):
+            cleanup_context = step_context(
+                f"cleanup-{number:02d}-{cleanup_step['id']}", cleanup_step["id"]
+            )
+            cleanup_results.append(_run_cleanup_step(cleanup_step, registry, cleanup_context))
             step_scope.update(cleanup_results[-1].produced)
 
     verdicts: list[Verdict] = [worst_step]
