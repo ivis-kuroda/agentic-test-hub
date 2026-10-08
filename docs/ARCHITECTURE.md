@@ -26,7 +26,7 @@ the index has) and the migration cost jumps.
 Practical consequences:
 
 - Anything a user edits goes in the YAML, not the index.
-- Run results are *not* specifications. They live outside git entirely, keyed
+- Run results are _not_ specifications. They live outside git entirely, keyed
   by run id, because they are large, binary-heavy and disposable.
 
 ## Writing YAML from a web application
@@ -62,7 +62,7 @@ script in a container, seeding a database, writing to a search cluster,
 calling an API, driving a browser. So the hub never needs application
 knowledge in the first place.
 
-A plugin is primarily *configuration*, not code: a `plugin.yaml` declaring
+A plugin is primarily _configuration_, not code: a `plugin.yaml` declaring
 operations, connections and state providers. A TypeScript escape hatch exists
 for the rare thing that cannot be declared. Keeping the common case
 declarative means a plugin can be maintained by people who do not write
@@ -116,11 +116,11 @@ exclusive execution.
 
 One source, three audiences:
 
-| View | Audience | Shape |
-|---|---|---|
-| Execution | Playwright, AI agents | Baselines fully expanded, every reference resolved, no inheritance |
-| Review | External reviewers | Viewpoints with their rationale, the coverage matrix, gaps; steps collapsed |
-| Delivery | Contractual deliverable | The organisation's existing spreadsheet layout, one row per step |
+| View      | Audience                | Shape                                                                       |
+| --------- | ----------------------- | --------------------------------------------------------------------------- |
+| Execution | Playwright, AI agents   | Baselines fully expanded, every reference resolved, no inheritance          |
+| Review    | External reviewers      | Viewpoints with their rationale, the coverage matrix, gaps; steps collapsed |
+| Delivery  | Contractual deliverable | The organisation's existing spreadsheet layout, one row per step            |
 
 Reviewers look at viewpoints and matrices far more than at steps, so the
 review view is a first-class output rather than a by-product.
@@ -167,7 +167,7 @@ errors, and leave the data as it claimed.
 
 One practical caveat: "no errors on this channel" is unusable against a mature
 application, where existing warnings would fail every case. Known pre-existing
-noise is filtered by pattern so the condition asks whether *this change*
+noise is filtered by pattern so the condition asks whether _this change_
 introduced anything — and suppressed entries are counted, so the allowance
 stays visible rather than quietly growing.
 
@@ -182,7 +182,7 @@ step's `produces` reads the same paths through the same helper
 (`getResultAtPath` / `get_result_at_path`), so the two never disagree. Python
 accepts the camelCase names from YAML and maps them to snake_case.
 
-- `keys`: the subject is an object whose key *set* equals `value`.
+- `keys`: the subject is an object whose key _set_ equals `value`.
 - `one_of`: the subject equals one of `values`, string/number tolerant.
 - `compare`: `op` (`lt|lte|gt|gte`) against a number; the subject is coerced.
 - `http_status.alsoAccepts`: further statuses that also satisfy it.
@@ -206,7 +206,12 @@ accepts the camelCase names from YAML and maps them to snake_case.
 - `ExecutionResult.headers` holds response headers with lower-cased names.
   A step's `produces` entry is a dotted path or `{from, pattern}`, taking
   capture group 1 of `pattern` from the path's value (an identifier at the
-  tail of a `Location` header, say).
+  tail of a `Location` header, say). The pattern form must yield a value: if
+  `from` is absent or the pattern does not match (or has no group 1), the
+  step fails (verdict `fail`, reason in `StepRunResult.error`, e.g.
+  `produces "recid": pattern /…/ did not match "<value>"`) and its
+  dependants are skipped as inconclusive. A plain-path entry that is absent
+  is unchanged: it produces nothing, and a later `{{step.name}}` fails loudly.
 
 ## Cleanup and the `run` scope
 
@@ -243,13 +248,13 @@ around all steps), `NN-<step-id>` or `cleanup-NN-<step-id>`. `<phase>` is
 `before`, `after` or `during` (an http exchange); `diff-...` files are the
 unified diff of a before/after pair. Repeated names get `-2`, `-3`.
 
-| Kind | Evidence | Files |
-|---|---|---|
-| 1 | screenshot | `{before,after}-screenshot-<op>.png` per browser operation |
-| 2 | browser console + network, or API request/response | `after-console-<op>.json`, `after-network-<op>.json` (with a 16 KiB `response_body_preview` for non-GET xhr/fetch); `during-network-http-<op>.json` per http call |
-| 3 | DB records before/after | `{before,after,diff}-db-records-<collector op>` |
-| 4 | application log | `{before,after,diff}-app-log-<collector op>` |
-| 5 | DB log | `{before,after,diff}-db-log-<collector op>` |
+| Kind | Evidence                                           | Files                                                                                                                                                             |
+| ---- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | screenshot                                         | `{before,after}-screenshot-<op>.png` per browser operation                                                                                                        |
+| 2    | browser console + network, or API request/response | `after-console-<op>.json`, `after-network-<op>.json` (with a 16 KiB `response_body_preview` for non-GET xhr/fetch); `during-network-http-<op>.json` per http call |
+| 3    | DB records before/after                            | `{before,after,diff}-db-records-<collector op>`                                                                                                                   |
+| 4    | application log                                    | `{before,after,diff}-app-log-<collector op>`                                                                                                                      |
+| 5    | DB log                                             | `{before,after,diff}-db-log-<collector op>`                                                                                                                       |
 
 `index.json` is rewritten atomically after every file, so it is always valid:
 `{schemaVersion, runId, startedAt, entries[], warnings[]}`. An entry has
@@ -296,14 +301,14 @@ Add a feature there when it cannot be implemented in the TypeScript runner.
 Running an agent for every test execution is slow, expensive and
 non-reproducible. The division is:
 
-| Phase | Who |
-|---|---|
-| Deriving factors and levels from design documents and implementation | AI, reviewed by a human |
-| Deciding which combinations to test | Human, from AI proposals |
-| Writing the test code | AI; output is committed |
-| Routine execution | The committed code |
-| Diagnosing a failure | AI, reading trace, logs and screenshots |
-| Assertions that need judgement | AI, only for expectations typed as such |
+| Phase                                                                | Who                                     |
+| -------------------------------------------------------------------- | --------------------------------------- |
+| Deriving factors and levels from design documents and implementation | AI, reviewed by a human                 |
+| Deciding which combinations to test                                  | Human, from AI proposals                |
+| Writing the test code                                                | AI; output is committed                 |
+| Routine execution                                                    | The committed code                      |
+| Diagnosing a failure                                                 | AI, reading trace, logs and screenshots |
+| Assertions that need judgement                                       | AI, only for expectations typed as such |
 
 Combination explosion is real: a suite with fifteen factors has an
 intractable full product. Strategy is explicit per matrix — vary one factor at

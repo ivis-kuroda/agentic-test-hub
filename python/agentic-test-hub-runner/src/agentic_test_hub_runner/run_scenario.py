@@ -46,19 +46,30 @@ _DEFAULT_EVIDENCE_PLAN = {
 }
 
 
-def _extract(action: ExecutionResult, production: str | dict[str, str]) -> tuple[bool, Any]:
-    """Evaluates one `produces` entry: a dotted path, or `{from, pattern}`
-    taking group 1 of the pattern from the path's value. A pattern that does
-    not match (or has no group 1) produces nothing."""
+def _extract(
+    action: ExecutionResult, name: str, production: str | dict[str, str]
+) -> tuple[bool, Any, str | None]:
+    """Evaluates one `produces` entry as `(present, value, failure)`. A dotted
+    path that is absent just produces nothing. `{from, pattern}` takes group 1
+    of the pattern from the path's value and must succeed: an absent path, a
+    non-scalar value, a pattern that does not match or has no group 1 yields
+    a `failure` reason, which fails the step."""
     if isinstance(production, str):
-        return get_result_at_path(action, production)
+        present, value = get_result_at_path(action, production)
+        return present, value, None
     present, value = get_result_at_path(action, production["from"])
-    if not present or not isinstance(value, (str, int, float)) or isinstance(value, bool):
-        return False, None
+    if not present:
+        return False, None, f'produces "{name}": "{production["from"]}" is absent from the result'
+    if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+        return False, None, f'produces "{name}": "{production["from"]}" is not a scalar value'
     match = re.search(production["pattern"], str(value))
     if match is None or match.lastindex is None or match.group(1) is None:
-        return False, None
-    return True, match.group(1)
+        return (
+            False,
+            None,
+            f'produces "{name}": pattern /{production["pattern"]}/ did not match "{value}"',
+        )
+    return True, match.group(1), None
 
 
 @dataclass(frozen=True)
@@ -72,14 +83,17 @@ class StepRunResult:
     skipped: dict[str, str] | None = None
     action: ExecutionResult | None = None
     error: str | None = None
-    """Set when running the step raised (cleanup steps only): the message."""
+    """Why the step failed outside its expectations: the message of what a
+    cleanup step raised, or the reason a `{from, pattern}` production did not
+    yield a value (the verdict is then `fail`)."""
 
 
 def run_step(
     step: dict[str, Any], registry: ExecutorRegistry, context: ExecutionContext
 ) -> StepRunResult:
     """Runs one scenario step: its action (if any), every expectation, then
-    extracts whatever it `produces` via a dotted path into its own result."""
+    extracts whatever it `produces` via a dotted path into its own result.
+    A `{from, pattern}` production that yields nothing fails the step."""
     action_ref = step.get("action")
     action = (
         _NO_ACTION
@@ -98,17 +112,21 @@ def run_step(
         )
 
     produced: dict[str, Any] = {}
+    failures: list[str] = []
     for name, production in step.get("produces", {}).items():
-        present, value = _extract(action, production)
-        if present:
+        present, value, failure = _extract(action, name, production)
+        if failure is not None:
+            failures.append(failure)
+        elif present:
             produced[name] = value
 
     return StepRunResult(
         step_id=step["id"],
         action=action,
         expectations=expectations,
-        verdict=compose_verdict(expectations),
+        verdict="fail" if failures else compose_verdict(expectations),
         produced=produced,
+        error="; ".join(failures) if failures else None,
     )
 
 

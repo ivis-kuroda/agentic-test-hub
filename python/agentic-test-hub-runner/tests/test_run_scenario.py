@@ -125,10 +125,56 @@ def test_produces_takes_group_one_of_a_pattern_over_a_header(context, registry_w
         "produces": {
             "recid": {"from": "headers.location", "pattern": r"/records/(\d+)$"},
             "plain": "headers.location",
-            "missing": {"from": "headers.location", "pattern": r"/zzz/(\d+)"},
         },
     }
     result = run_step(step, registry, context)
     assert result.produced["recid"] == "4711"
     assert result.produced["plain"] == "https://api.invalid/v1/records/4711"
-    assert "missing" not in result.produced
+    assert result.error is None
+
+
+def test_a_pattern_that_does_not_match_fails_the_step(context, registry_with) -> None:
+    registry = registry_with(_location_fetch())
+    step = {
+        **_scenario()["steps"][0],
+        "produces": {"recid": {"from": "headers.location", "pattern": r"/zzz/(\d+)"}},
+    }
+    result = run_step(step, registry, context)
+    assert result.verdict == "fail"
+    assert result.error == (
+        'produces "recid": pattern //zzz/(\\d+)/ did not match '
+        '"https://api.invalid/v1/records/4711"'
+    )
+    assert result.produced == {}
+
+
+def test_a_pattern_over_an_absent_path_fails_the_step(context, registry_with) -> None:
+    registry = registry_with(_location_fetch())
+    step = {
+        **_scenario()["steps"][0],
+        "produces": {"recid": {"from": "headers.nope", "pattern": r"(\d+)"}},
+    }
+    result = run_step(step, registry, context)
+    assert result.verdict == "fail"
+    assert "absent" in (result.error or "")
+
+
+def test_a_plain_path_that_is_absent_still_produces_nothing(context, registry_with) -> None:
+    registry = registry_with(_location_fetch())
+    step = {**_scenario()["steps"][0], "produces": {"x": "headers.nope"}}
+    result = run_step(step, registry, context)
+    assert result.verdict == "pass"
+    assert result.produced == {}
+    assert result.error is None
+
+
+def test_a_failed_production_skips_dependants(context, registry_with) -> None:
+    registry = registry_with(_location_fetch())
+    scenario = _scenario()
+    scenario["steps"][0] = {
+        **scenario["steps"][0],
+        "produces": {"recid": {"from": "headers.location", "pattern": r"/zzz/(\d+)"}},
+    }
+    result = run_scenario(scenario, registry, context)
+    assert result.steps[0].verdict == "fail"
+    assert result.steps[1].skipped is not None

@@ -24,26 +24,46 @@ import type { ExecutorRegistry } from "./executor/registry.ts";
 import type { ExecutionContext, ExecutionResult } from "./executor/types.ts";
 
 /** Stands in for a step with no action, so expectations still have something to check. */
-const NO_ACTION: ExecutionResult = { operation: "(none)", ok: true, durationMs: 0 };
+const NO_ACTION: ExecutionResult = {
+  operation: "(none)",
+  ok: true,
+  durationMs: 0,
+};
 
 /**
- * Evaluates one `produces` entry: a dotted path, or a path plus a pattern
- * whose first capture group is taken. A pattern that does not match, or has
- * no group 1, produces nothing — a later `{{step.name}}` then fails loudly.
+ * Evaluates one `produces` entry. A dotted path that is absent just produces
+ * nothing. `{from, pattern}` takes capture group 1 of the pattern from the
+ * path's value and must succeed: an absent path, a non-scalar value, or a
+ * pattern that does not match (or has no group 1) is a `failure` reason,
+ * which fails the step.
  */
 function extract(
   action: ExecutionResult,
+  name: string,
   production: Step["produces"][string],
-): { present: true; value: unknown } | { present: false } {
+): { present: true; value: unknown } | { present: false; failure?: string } {
   if (typeof production === "string") return getResultAtPath(action, production);
   const read = getResultAtPath(action, production.from);
-  const raw = read.present ? read.value : undefined;
-  if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
-    return { present: false };
+  if (!read.present) {
+    return {
+      present: false,
+      failure: `produces "${name}": "${production.from}" is absent from the result`,
+    };
   }
-  const match = new RegExp(production.pattern).exec(String(raw));
-  const captured = match?.[1];
-  return captured === undefined ? { present: false } : { present: true, value: captured };
+  const raw = read.value;
+  if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
+    return {
+      present: false,
+      failure: `produces "${name}": "${production.from}" is not a scalar value`,
+    };
+  }
+  const captured = new RegExp(production.pattern).exec(String(raw))?.[1];
+  return captured === undefined
+    ? {
+        present: false,
+        failure: `produces "${name}": pattern /${production.pattern}/ did not match "${String(raw)}"`,
+      }
+    : { present: true, value: captured };
 }
 
 /** What running one step established. */
@@ -56,7 +76,11 @@ export interface StepRunResult {
   readonly verdict: Verdict;
   /** Values this step produced, for later steps' `context.scopes.step`. */
   readonly produced: Readonly<Record<string, unknown>>;
-  /** Set when running the step threw (cleanup steps only); the message. */
+  /**
+   * Why the step failed outside its expectations: the message of what a
+   * cleanup step threw, or the reason a `{from, pattern}` production did not
+   * yield a value (the verdict is then `fail`).
+   */
   readonly error?: string;
 }
 
@@ -68,7 +92,8 @@ export interface StepRunResult {
  * A step's `produces` entry is a dotted path into its own `ExecutionResult`
  * (read by `getResultAtPath`, the reader assertions' `at` uses too), or
  * `{from, pattern}` taking capture group 1 of the pattern from that path's
- * value. A plugin needing something richer has the `extension` executor as
+ * value; the latter fails the step (verdict `fail`, reason in `error`) when
+ * it yields nothing. A plugin needing something richer has the `extension` executor as
  * its escape hatch.
  *
  * @param step - The step to run.
@@ -93,21 +118,27 @@ export async function runStep(
       expectation.kind === "operation_result"
         ? await registry.run(expectation.operation, expectation.params, context)
         : action;
-    expectations.push({ expectation, outcome: checkExpectation(expectation, subject) });
+    expectations.push({
+      expectation,
+      outcome: checkExpectation(expectation, subject),
+    });
   }
 
   const produced: Record<string, unknown> = {};
+  const failures: string[] = [];
   for (const [name, production] of Object.entries(step.produces)) {
-    const extracted = extract(action, production);
+    const extracted = extract(action, name, production);
     if (extracted.present) produced[name] = extracted.value;
+    else if (extracted.failure !== undefined) failures.push(extracted.failure);
   }
 
   return {
     stepId: step.id,
     action,
     expectations,
-    verdict: composeVerdict(expectations),
+    verdict: failures.length > 0 ? "fail" : composeVerdict(expectations),
     produced,
+    ...(failures.length > 0 ? { error: failures.join("; ") } : {}),
   };
 }
 
@@ -178,7 +209,10 @@ export async function runScenario(
   const cleanupResults: StepRunResult[] = [];
   const stepContext = (): ExecutionContext => ({
     ...context,
-    scopes: { ...context.scopes, step: { ...context.scopes.step, ...stepScope } },
+    scopes: {
+      ...context.scopes,
+      step: { ...context.scopes.step, ...stepScope },
+    },
   });
   let outcome: { worstStep: Verdict; evidence: VerdictResult | undefined };
 
@@ -189,7 +223,9 @@ export async function runScenario(
       if (unmetDependency !== undefined) {
         stepResults.push({
           stepId: step.id,
-          skipped: { reason: `depends on step ${unmetDependency}, which did not pass` },
+          skipped: {
+            reason: `depends on step ${unmetDependency}, which did not pass`,
+          },
           expectations: [],
           verdict: "inconclusive",
           produced: {},

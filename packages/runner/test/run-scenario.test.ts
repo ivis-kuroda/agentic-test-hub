@@ -155,11 +155,56 @@ describe("runStep produces with a pattern", () => {
     expect(result.produced["plain"]).toBe("https://api.invalid/v1/records/4711");
   });
 
-  it("produces nothing when the pattern does not match", async () => {
+  it("fails the step when the pattern does not match", async () => {
     const registry = registryWith(new HttpExecutor(locationFetch));
-    const step = stepProducing({ recid: { from: "headers.location", pattern: "/zzz/(\\d+)" } })!;
+    const step = stepProducing({
+      recid: { from: "headers.location", pattern: "/zzz/(\\d+)" },
+    })!;
     const result = await runStep(step, registry, context);
+    expect(result.verdict).toBe("fail");
+    expect(result.error).toBe(
+      'produces "recid": pattern /\/zzz\/(\\d+)/ did not match "https://api.invalid/v1/records/4711"',
+    );
     expect(result.produced).toEqual({});
+  });
+
+  it("fails the step when the pattern's source path is absent", async () => {
+    const registry = registryWith(new HttpExecutor(locationFetch));
+    const step = stepProducing({
+      recid: { from: "headers.nope", pattern: "(\\d+)" },
+    })!;
+    const result = await runStep(step, registry, context);
+    expect(result.verdict).toBe("fail");
+    expect(result.error).toContain("absent");
+  });
+
+  it("still produces nothing, without failing, for an absent plain path", async () => {
+    const registry = registryWith(new HttpExecutor(locationFetch));
+    const step = stepProducing({ x: "headers.nope" })!;
+    const result = await runStep(step, registry, context);
+    expect(result.verdict).toBe("pass");
+    expect(result.produced).toEqual({});
+    expect(result.error).toBeUndefined();
+  });
+
+  it("skips dependants of a step whose production failed", async () => {
+    const registry = registryWith(new HttpExecutor(locationFetch));
+    const base = scenarioWith({});
+    const scenario = {
+      ...base,
+      steps: [
+        {
+          ...base.steps[0]!,
+          produces: {
+            recid: { from: "headers.location", pattern: "/zzz/(\\d+)" },
+          } as never,
+        },
+        ...base.steps.slice(1),
+      ],
+    };
+    const result = await runScenario(scenario, registry, context);
+    expect(result.steps[0]?.verdict).toBe("fail");
+    expect(result.steps[1]?.skipped).toBeDefined();
   });
 });
 
