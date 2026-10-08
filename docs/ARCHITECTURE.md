@@ -208,6 +208,23 @@ accepts the camelCase names from YAML and maps them to snake_case.
   capture group 1 of `pattern` from the path's value (an identifier at the
   tail of a `Location` header, say).
 
+## Cleanup and the `run` scope
+
+A scenario's `cleanup: [Step]` (a cleanup step's `expect` may be empty) always
+runs after its steps and after evidence collection, even when a step failed or
+raised; an exception then propagates once cleanup is done. Cleanup steps see
+every `{{step.*}}` value produced earlier. A cleanup step that does not
+complete or breaks an expectation cannot fail the scenario but caps its
+verdict at `inconclusive`, because leftovers may now exist; each is reported
+in `ScenarioRunResult.cleanup`. If preconditions were not met nothing ran, so
+no cleanup runs.
+
+`runCase`/`runScenario` give the template a `run` scope, unless the caller
+already supplied one: `{{run.startedAt}}` (UTC ISO-8601, seconds, `Z`) and
+`{{run.id}}` (short id). An evidence collector's `params` in the manifest are
+rendered with the context scopes, so a collector can read only what this run
+produced, for example `since: "{{run.startedAt}}"`.
+
 ## AI at authoring time, deterministic code at run time
 
 Running an agent for every test execution is slow, expensive and

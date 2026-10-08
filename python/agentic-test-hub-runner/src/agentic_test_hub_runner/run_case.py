@@ -32,7 +32,9 @@ from .evidence import (
 from .expectation import check_expectation
 from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
+from .run_scope import with_run_scope
 from .state import PreparationReport, prepare_states
+from .template import render_deep
 from .types import ExecutionContext, ExecutionResult
 from .verdict import EvidenceWaiver, Observation, Verdict, VerdictResult, evaluate_verdict
 
@@ -114,7 +116,10 @@ def collect_evidence(
         call = context.manifest.evidence.get(source)
         if call is None:
             continue
-        result = registry.run(call["operation"], call.get("params", {}), context)
+        # A collector's params may reference the run's own scopes (for example
+        # `{{run.startedAt}}` to read only what this run logged).
+        params = render_deep(call.get("params", {}), context.scopes)
+        result = registry.run(call["operation"], params, context)
         observations.append(observe_from_result(source, result, options.observe))
     return observations
 
@@ -156,6 +161,7 @@ def run_case(
         action, from `deriveActionParams` at generation time.
     """
     options = options or RunOptions()
+    context = with_run_scope(context)
     policy = options.policy or context.manifest.policy or DEFAULT_VERDICT_POLICY
 
     preparation = prepare_states(resolved.get("preconditions", []), registry, context)

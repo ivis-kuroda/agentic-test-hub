@@ -77,6 +77,18 @@ export const Step = z.object({
 export type Step = z.infer<typeof Step>;
 
 /**
+ * A step run after the scenario's steps to undo what they created.
+ *
+ * Shaped like {@link Step} except that `expect` may be empty: a teardown
+ * request usually has nothing worth asserting beyond completing.
+ */
+export const CleanupStep = Step.extend({
+  expect: z.array(Expectation).default([]),
+});
+/** A step run after the scenario's steps to undo what they created. */
+export type CleanupStep = z.infer<typeof CleanupStep>;
+
+/**
  * An ordered sequence of steps that share accumulated state.
  *
  * Distinct from a family of {@link TestCase}s because order is part of the
@@ -98,6 +110,16 @@ export const Scenario = z.object({
   preconditions: z.array(StateRef).default([]),
   /** Steps in the order they must run. */
   steps: z.array(Step).min(1),
+  /**
+   * Steps that always run after `steps` and evidence collection, even when a
+   * step failed or raised, in order.
+   *
+   * They see everything earlier steps `produces`. A cleanup step that does
+   * not complete or whose expectation is violated cannot fail the scenario
+   * but downgrades it to at most `inconclusive`, since the system under test
+   * may now hold leftovers.
+   */
+  cleanup: z.array(CleanupStep).default([]),
   /** Overrides the suite's default evidence collection for this scenario. */
   evidence: EvidencePlan.optional(),
   /**

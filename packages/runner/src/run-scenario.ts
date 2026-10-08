@@ -2,6 +2,7 @@ import {
   DEFAULT_EVIDENCE_PLAN,
   DEFAULT_VERDICT_POLICY,
   evaluateVerdict,
+  type CleanupStep,
   type Scenario,
   type Step,
   type Verdict,
@@ -17,6 +18,7 @@ import {
   type ExpectationOutcome,
   type RunOptions,
 } from "./run-case.ts";
+import { withRunScope } from "./run-scope.ts";
 import { prepareStates, type PreparationReport } from "./state.ts";
 import type { ExecutorRegistry } from "./executor/registry.ts";
 import type { ExecutionContext, ExecutionResult } from "./executor/types.ts";
@@ -54,6 +56,8 @@ export interface StepRunResult {
   readonly verdict: Verdict;
   /** Values this step produced, for later steps' `context.scopes.step`. */
   readonly produced: Readonly<Record<string, unknown>>;
+  /** Set when running the step threw (cleanup steps only); the message. */
+  readonly error?: string;
 }
 
 /**
@@ -61,11 +65,11 @@ export interface StepRunResult {
  * against it (or, for an `operation_result` expectation, against its own
  * operation's result), then extracts whatever the step `produces`.
  *
- * A step's `produces` expression is read as a dotted path into its own
- * `ExecutionResult` (`getAtPath`, the same reader overrides use) — the
- * schema calls this "an extraction expression the active plugin
- * understands", and this is the generic v1 interpretation; a plugin needing
- * something richer has the `extension` executor as its escape hatch.
+ * A step's `produces` entry is a dotted path into its own `ExecutionResult`
+ * (read by `getResultAtPath`, the reader assertions' `at` uses too), or
+ * `{from, pattern}` taking capture group 1 of the pattern from that path's
+ * value. A plugin needing something richer has the `extension` executor as
+ * its escape hatch.
  *
  * @param step - The step to run.
  * @param registry - Executors to run its operations with.
@@ -74,7 +78,7 @@ export interface StepRunResult {
  * @returns What running the step established.
  */
 export async function runStep(
-  step: Step,
+  step: Step | CleanupStep,
   registry: ExecutorRegistry,
   context: ExecutionContext,
 ): Promise<StepRunResult> {
@@ -112,6 +116,8 @@ export interface ScenarioRunResult {
   readonly scenarioId: string;
   readonly preparation: PreparationReport;
   readonly steps: readonly StepRunResult[];
+  /** The cleanup steps, in order. Empty when there were none or preparation failed. */
+  readonly cleanup: readonly StepRunResult[];
   /** Unset only when preconditions were never satisfied. */
   readonly evidence?: VerdictResult;
   readonly verdict: Verdict;
@@ -131,9 +137,16 @@ export interface ScenarioRunResult {
  * judged under the last step's polarity — the state the scenario actually
  * ends in is what its overall evidence should be judged against.
  *
+ * The scenario's `cleanup` steps always run afterwards, after evidence
+ * collection, even when a step failed or threw (the throw then propagates).
+ * A cleanup step that does not complete or breaks an expectation downgrades
+ * the verdict to at most `inconclusive`. If preconditions are not met nothing
+ * ran, so no cleanup runs either.
+ *
  * @param scenario - The scenario to run.
  * @param registry - Executors to run its operations with.
- * @param context - Manifest, scopes and cancellation.
+ * @param baseContext - Manifest, scopes and cancellation. A `run` scope
+ *   (`startedAt`, `id`) is added unless it already carries one.
  * @param options - A browser session to read, a policy override, noise
  *   filtering.
  * @returns What preparing, running and judging the scenario established.
@@ -141,59 +154,114 @@ export interface ScenarioRunResult {
 export async function runScenario(
   scenario: Scenario,
   registry: ExecutorRegistry,
-  context: ExecutionContext,
+  baseContext: ExecutionContext,
   options: RunOptions = {},
 ): Promise<ScenarioRunResult> {
+  const context = withRunScope(baseContext);
   const policy = options.policy ?? context.manifest.policy ?? DEFAULT_VERDICT_POLICY;
 
   const preparation = await prepareStates(scenario.preconditions, registry, context);
   if (!preparation.ready) {
-    return { scenarioId: scenario.id, preparation, steps: [], verdict: "inconclusive" };
+    // Nothing was created, so there is nothing to clean up.
+    return {
+      scenarioId: scenario.id,
+      preparation,
+      steps: [],
+      cleanup: [],
+      verdict: "inconclusive",
+    };
   }
 
   const stepScope: Record<string, unknown> = {};
   const stepResults: StepRunResult[] = [];
-  const passedSteps = new Set<string>();
+  const cleanupResults: StepRunResult[] = [];
+  const stepContext = (): ExecutionContext => ({
+    ...context,
+    scopes: { ...context.scopes, step: { ...context.scopes.step, ...stepScope } },
+  });
+  let outcome: { worstStep: Verdict; evidence: VerdictResult | undefined };
 
-  for (const step of scenario.steps) {
-    const unmetDependency = step.dependsOn.find((id) => !passedSteps.has(id));
-    if (unmetDependency !== undefined) {
-      stepResults.push({
-        stepId: step.id,
-        skipped: { reason: `depends on step ${unmetDependency}, which did not pass` },
-        expectations: [],
-        verdict: "inconclusive",
-        produced: {},
-      });
-      continue;
+  try {
+    const passedSteps = new Set<string>();
+    for (const step of scenario.steps) {
+      const unmetDependency = step.dependsOn.find((id) => !passedSteps.has(id));
+      if (unmetDependency !== undefined) {
+        stepResults.push({
+          stepId: step.id,
+          skipped: { reason: `depends on step ${unmetDependency}, which did not pass` },
+          expectations: [],
+          verdict: "inconclusive",
+          produced: {},
+        });
+        continue;
+      }
+
+      const result = await runStep(step, registry, stepContext());
+      stepResults.push(result);
+      if (result.verdict === "pass") passedSteps.add(step.id);
+      Object.assign(stepScope, result.produced);
     }
 
-    const stepContext: ExecutionContext = {
-      ...context,
-      scopes: { ...context.scopes, step: { ...context.scopes.step, ...stepScope } },
-    };
-    const result = await runStep(step, registry, stepContext);
-    stepResults.push(result);
-    if (result.verdict === "pass") passedSteps.add(step.id);
-    Object.assign(stepScope, result.produced);
+    const worstStep = worstVerdict(stepResults.map((result) => result.verdict));
+    const plan = scenario.evidence ?? DEFAULT_EVIDENCE_PLAN;
+    const shouldCollect = plan.timing !== "on_failure" || worstStep === "fail";
+
+    let evidence: VerdictResult | undefined;
+    if (shouldCollect) {
+      const lastStep = scenario.steps.at(-1)!;
+      const observations = await collectEvidence(plan, registry, stepContext(), options);
+      evidence = evaluateVerdict(policy, lastStep.polarity, observations, scenario.evidenceWaivers);
+    }
+    outcome = { worstStep, evidence };
+  } finally {
+    // Runs whether the steps passed, failed or threw; a throw then continues
+    // to propagate once the leftovers have been dealt with.
+    for (const step of scenario.cleanup) {
+      cleanupResults.push(await runCleanupStep(step, registry, stepContext()));
+    }
   }
 
-  const worstStep = worstVerdict(stepResults.map((result) => result.verdict));
-  const plan = scenario.evidence ?? DEFAULT_EVIDENCE_PLAN;
-  const shouldCollect = plan.timing !== "on_failure" || worstStep === "fail";
-
-  let evidence: VerdictResult | undefined;
-  if (shouldCollect) {
-    const lastStep = scenario.steps.at(-1)!;
-    const observations = await collectEvidence(plan, registry, context, options);
-    evidence = evaluateVerdict(policy, lastStep.polarity, observations, scenario.evidenceWaivers);
-  }
+  const cleanupFailed = cleanupResults.some(cleanupDidNotSucceed);
+  const verdicts: Verdict[] = [outcome.worstStep];
+  if (outcome.evidence !== undefined) verdicts.push(outcome.evidence.verdict);
+  // Cleanup can only make the verdict less certain, never fail the scenario.
+  if (cleanupFailed) verdicts.push("inconclusive");
 
   return {
     scenarioId: scenario.id,
     preparation,
     steps: stepResults,
-    ...(evidence === undefined ? {} : { evidence }),
-    verdict: worstVerdict(evidence === undefined ? [worstStep] : [worstStep, evidence.verdict]),
+    cleanup: cleanupResults,
+    ...(outcome.evidence === undefined ? {} : { evidence: outcome.evidence }),
+    verdict: worstVerdict(verdicts),
   };
+}
+
+/** Whether a cleanup step failed to complete or broke one of its expectations. */
+function cleanupDidNotSucceed(result: StepRunResult): boolean {
+  return result.error !== undefined || result.action?.ok === false || result.verdict !== "pass";
+}
+
+/** Runs a cleanup step, turning anything it throws into a recorded result so later steps still run. */
+async function runCleanupStep(
+  step: CleanupStep,
+  registry: ExecutorRegistry,
+  context: ExecutionContext,
+): Promise<StepRunResult> {
+  try {
+    const result = await runStep(step, registry, context);
+    // runStep's own expectations-only verdict ignores an action that did not
+    // complete; for cleanup that is exactly the failure worth reporting.
+    return result.action?.ok === false && result.verdict === "pass"
+      ? { ...result, verdict: "inconclusive" }
+      : result;
+  } catch (cause) {
+    return {
+      stepId: step.id,
+      expectations: [],
+      verdict: "inconclusive",
+      produced: {},
+      error: cause instanceof Error ? cause.message : String(cause),
+    };
+  }
 }

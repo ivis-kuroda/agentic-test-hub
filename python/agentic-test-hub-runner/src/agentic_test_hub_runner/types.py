@@ -18,7 +18,7 @@ class ExecutionContext:
     manifest: Manifest
     """The loaded manifest, for resolving connections."""
     scopes: dict[str, Any] = field(default_factory=dict)
-    """Values available to interpolation (`env`/`param`/`step`)."""
+    """Values available to interpolation (`env`/`param`/`step`/`run`)."""
     root: str = "."
     """Plugin repository root, which relative paths are resolved against."""
 

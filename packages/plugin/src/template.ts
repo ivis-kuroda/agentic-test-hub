@@ -12,6 +12,12 @@ export interface TemplateScopes {
   readonly param?: Readonly<Record<string, unknown>>;
   /** Values produced by earlier steps of the same scenario. */
   readonly step?: Readonly<Record<string, unknown>>;
+  /**
+   * Facts about the current run, set by `runCase`/`runScenario`: `startedAt`
+   * (UTC ISO-8601, seconds precision, with `Z`) and a short `id`. Lets an
+   * evidence collector ask for "everything since this run began".
+   */
+  readonly run?: Readonly<Record<string, unknown>>;
 }
 
 /** A placeholder that could not be resolved. */
@@ -29,7 +35,7 @@ export class TemplateError extends Error {
 const PLACEHOLDER = /\{\{\s*([a-z]+)\.([A-Za-z0-9_.-]+)\s*\}\}/g;
 /** Matches a string that, once trimmed, is nothing but one placeholder. */
 const WHOLE_PLACEHOLDER = /^\{\{\s*([a-z]+)\.([A-Za-z0-9_.-]+)\s*\}\}$/;
-const SCOPES = ["env", "param", "step"] as const;
+const SCOPES = ["env", "param", "step", "run"] as const;
 
 function lookup(scopes: TemplateScopes, scope: string, path: string): unknown {
   const root = scopes[scope as (typeof SCOPES)[number]];

@@ -10,7 +10,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-SCOPES = ("env", "param", "step")
+SCOPES = ("env", "param", "step", "run")
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-z]+)\.([A-Za-z0-9_.-]+)\s*\}\}")
 # Matches a string that, once stripped, is nothing but one placeholder.

@@ -189,7 +189,7 @@ export function validateSuite(suite: Suite): SuiteProblem[] {
     const at = `scenario/${scenario.id}`;
     requireViewpoints(`${at}.viewpoints`, scenario.viewpoints);
     const stepIds = new Set<string>();
-    for (const id of duplicates(scenario.steps.map((step) => step.id))) {
+    for (const id of duplicates([...scenario.steps, ...scenario.cleanup].map((step) => step.id))) {
       error(at, `step ${id} is declared more than once`);
     }
 
@@ -213,6 +213,14 @@ export function validateSuite(suite: Suite): SuiteProblem[] {
         }
       }
       stepIds.add(step.id);
+    }
+
+    for (const step of scenario.cleanup) {
+      const stepAt = `${at}/cleanup/${step.id}`;
+      requireViewpoints(`${stepAt}.viewpoints`, step.viewpoints);
+      for (const [index, expectation] of step.expect.entries()) {
+        requireViewpoints(`${stepAt}.expect[${index}]`, expectation.viewpoints);
+      }
     }
   }
 

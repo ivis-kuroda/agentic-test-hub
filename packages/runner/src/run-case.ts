@@ -12,6 +12,7 @@ import {
   type VerdictPolicy,
   type VerdictResult,
 } from "@agentic-test-hub/core";
+import { renderDeep } from "@agentic-test-hub/plugin";
 
 import { deriveActionParams } from "./derive-params.ts";
 import {
@@ -21,6 +22,7 @@ import {
   type ObserveOptions,
 } from "./evidence.ts";
 import { checkExpectation } from "./expectation.ts";
+import { withRunScope } from "./run-scope.ts";
 import { prepareStates, type PreparationReport } from "./state.ts";
 import type { AssertionOutcome } from "./assert.ts";
 import type { BrowserSession } from "./executor/browser.ts";
@@ -124,7 +126,10 @@ export async function collectEvidence(
     if (!plan.sources.includes(source)) continue;
     const call = context.manifest.evidence[source];
     if (call === undefined) continue;
-    const result = await registry.run(call.operation, call.params, context);
+    // A collector's params may reference the run's own scopes (for example
+    // `{{run.startedAt}}` to read only what this run logged).
+    const params = renderDeep(call.params, context.scopes);
+    const result = await registry.run(call.operation, params, context);
     observations.push(observeFromResult(source, result, options.observe));
   }
   return observations;
@@ -143,7 +148,8 @@ export async function collectEvidence(
  * @param testCase - The case to run.
  * @param baseline - Its baseline, already looked up.
  * @param registry - Executors available to run its operations with.
- * @param context - Manifest, scopes and cancellation.
+ * @param baseContext - Manifest, scopes and cancellation. A `run` scope
+ *   (`startedAt`, `id`) is added unless it already carries one.
  * @param options - A browser session to read, a policy override, noise
  *   filtering.
  * @returns What preparing, running and judging the case established.
@@ -152,9 +158,10 @@ export async function runCase(
   testCase: TestCase,
   baseline: Baseline,
   registry: ExecutorRegistry,
-  context: ExecutionContext,
+  baseContext: ExecutionContext,
   options: RunOptions = {},
 ): Promise<CaseRunResult> {
+  const context = withRunScope(baseContext);
   const policy = options.policy ?? context.manifest.policy ?? DEFAULT_VERDICT_POLICY;
   const resolved = applyOverrides(baseline, testCase.overrides);
 

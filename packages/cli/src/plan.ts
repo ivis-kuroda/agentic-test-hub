@@ -104,7 +104,7 @@ export function operationsTouched(
     const sources = plan.testCase.evidence?.sources ?? DEFAULT_EVIDENCE_PLAN.sources;
     for (const id of evidenceOperationIds(sources, manifest)) ids.add(id);
   } else {
-    for (const step of plan.scenario.steps) {
+    for (const step of [...plan.scenario.steps, ...plan.scenario.cleanup]) {
       if (step.action !== undefined) ids.add(step.action.operation);
       for (const expectation of step.expect) {
         if (expectation.kind === "operation_result") ids.add(expectation.operation);
@@ -273,7 +273,7 @@ function planScenario(
   const scenario = suite.scenarios.find((candidate) => candidate.id === id);
   if (!scenario) return refuse(`no scenario ${id} in this suite`);
 
-  for (const step of scenario.steps) {
+  for (const step of [...scenario.steps, ...scenario.cleanup]) {
     if (step.action === undefined) continue;
     if (!manifest.operations[step.action.operation]) {
       return refuse(

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CleanupStep } from "@agentic-test-hub/core";
+
 import type { ExpectationDraft } from "~/utils/expectationDraft.ts";
 
 /**
@@ -31,6 +33,8 @@ export interface ScenarioDraft {
   title: string;
   preconditions: string[];
   steps: StepDraft[];
+  /** Cleanup steps, carried through untouched: this editor does not edit them yet. */
+  cleanup: CleanupStep[];
   evidenceEnabled: boolean;
   evidenceSources: string[];
   evidenceTiming: "before" | "after" | "each_step" | "on_failure";

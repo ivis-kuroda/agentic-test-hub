@@ -154,6 +154,16 @@ describe("validateSuite", () => {
     expect(errorsOf({ ...sound, scenarios: [scenario] })[0]).toMatch(/depends on itself/);
   });
 
+  it("catches a cleanup step reusing a step id", () => {
+    const scenario = Scenario.parse({
+      id: "SC-X",
+      title: "t",
+      steps: [{ id: "S-1", summary: "first", expect: [{ kind: "http_status", status: 200 }] }],
+      cleanup: [{ id: "S-1", summary: "tidy" }],
+    });
+    expect(errorsOf({ ...sound, scenarios: [scenario] })[0]).toMatch(/declared more than once/);
+  });
+
   it("accepts a step depending on an earlier one", () => {
     const scenario = Scenario.parse({
       id: "SC-X",

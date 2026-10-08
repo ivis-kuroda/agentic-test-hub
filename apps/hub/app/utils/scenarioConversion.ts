@@ -27,6 +27,7 @@ export function emptyScenarioDraft(): ScenarioDraft {
     title: "",
     preconditions: [],
     steps: [newStepDraft()],
+    cleanup: [],
     evidenceEnabled: false,
     evidenceSources: [],
     evidenceTiming: "after",
@@ -70,6 +71,7 @@ export function scenarioDraftFromEntity(entity: Scenario): ScenarioDraft {
     title: entity.title,
     preconditions: [...entity.preconditions],
     steps: entity.steps.map(stepDraftFromEntity),
+    cleanup: structuredClone(entity.cleanup),
     evidenceEnabled: entity.evidence !== undefined,
     evidenceSources: entity.evidence?.sources ?? [],
     evidenceTiming: entity.evidence?.timing ?? "after",
@@ -123,6 +125,7 @@ export function scenarioDraftToEntity(draft: ScenarioDraft): unknown {
     title: draft.title,
     preconditions: draft.preconditions,
     steps: draft.steps.map(stepDraftToEntity),
+    cleanup: draft.cleanup,
     ...(draft.evidenceEnabled
       ? {
           evidence: {

@@ -23,6 +23,7 @@ from .run_case import (
     compose_verdict,
     worst_verdict,
 )
+from .run_scope import with_run_scope
 from .state import PreparationReport, prepare_states
 from .types import ExecutionContext, ExecutionResult
 from .verdict import EvidenceWaiver, Verdict, VerdictResult, evaluate_verdict
@@ -67,6 +68,8 @@ class StepRunResult:
     produced: dict[str, Any] = field(default_factory=dict)
     skipped: dict[str, str] | None = None
     action: ExecutionResult | None = None
+    error: str | None = None
+    """Set when running the step raised (cleanup steps only): the message."""
 
 
 def run_step(
@@ -82,7 +85,7 @@ def run_step(
     )
 
     expectations: list[ExpectationOutcome] = []
-    for expectation in step["expect"]:
+    for expectation in step.get("expect", []):
         if expectation["kind"] == "operation_result":
             subject = registry.run(expectation["operation"], expectation.get("params", {}), context)
         else:
@@ -115,6 +118,8 @@ class ScenarioRunResult:
     steps: list[StepRunResult]
     verdict: Verdict
     evidence: VerdictResult | None = None
+    cleanup: list[StepRunResult] = field(default_factory=list)
+    """The cleanup steps, in order; empty when there were none or preparation failed."""
 
 
 def run_scenario(
@@ -130,8 +135,16 @@ def run_scenario(
 
     Evidence is collected once, after the last step, and judged under the
     last step's polarity — a scenario has no polarity of its own.
+
+    The scenario's `cleanup` steps always run afterwards, after evidence
+    collection, even when a step failed or raised (the exception then
+    propagates). A cleanup step that does not complete or breaks an
+    expectation downgrades the verdict to at most `inconclusive`. If the
+    preconditions are not met nothing ran, so no cleanup runs either. A `run`
+    scope (`startedAt`, `id`) is added to `context` unless it has one.
     """
     options = options or RunOptions()
+    context = with_run_scope(context)
     policy: VerdictPolicy = options.policy or context.manifest.policy or DEFAULT_VERDICT_POLICY
 
     preparation = prepare_states(scenario.get("preconditions", []), registry, context)
@@ -140,54 +153,96 @@ def run_scenario(
 
     step_scope: dict[str, Any] = {}
     step_results: list[StepRunResult] = []
+    cleanup_results: list[StepRunResult] = []
     passed_steps: set[str] = set()
 
-    for step in scenario["steps"]:
-        depends_on = step.get("dependsOn", [])
-        unmet = next((dep for dep in depends_on if dep not in passed_steps), None)
-        if unmet is not None:
-            step_results.append(
-                StepRunResult(
-                    step_id=step["id"],
-                    expectations=[],
-                    verdict="inconclusive",
-                    skipped={"reason": f"depends on step {unmet}, which did not pass"},
-                )
-            )
-            continue
-
-        step_context = replace(
+    def step_context() -> ExecutionContext:
+        return replace(
             context,
             scopes={**context.scopes, "step": {**(context.scopes.get("step") or {}), **step_scope}},
         )
-        result = run_step(step, registry, step_context)
-        step_results.append(result)
-        if result.verdict == "pass":
-            passed_steps.add(step["id"])
-        step_scope.update(result.produced)
 
-    worst_step = worst_verdict([result.verdict for result in step_results])
-    plan = scenario.get("evidence") or _DEFAULT_EVIDENCE_PLAN
-    should_collect = plan.get("timing") != "on_failure" or worst_step == "fail"
+    try:
+        for step in scenario["steps"]:
+            depends_on = step.get("dependsOn", [])
+            unmet = next((dep for dep in depends_on if dep not in passed_steps), None)
+            if unmet is not None:
+                step_results.append(
+                    StepRunResult(
+                        step_id=step["id"],
+                        expectations=[],
+                        verdict="inconclusive",
+                        skipped={"reason": f"depends on step {unmet}, which did not pass"},
+                    )
+                )
+                continue
 
-    evidence: VerdictResult | None = None
-    if should_collect:
-        last_step = scenario["steps"][-1]
-        observations = collect_evidence(plan, registry, context, options)
-        waivers = [
-            EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
-            for waiver in scenario.get("evidenceWaivers", [])
-        ]
-        evidence = evaluate_verdict(
-            policy, last_step.get("polarity", "nominal"), observations, waivers
-        )
+            result = run_step(step, registry, step_context())
+            step_results.append(result)
+            if result.verdict == "pass":
+                passed_steps.add(step["id"])
+            step_scope.update(result.produced)
 
-    verdict = worst_verdict([worst_step] if evidence is None else [worst_step, evidence.verdict])
+        worst_step = worst_verdict([result.verdict for result in step_results])
+        plan = scenario.get("evidence") or _DEFAULT_EVIDENCE_PLAN
+        should_collect = plan.get("timing") != "on_failure" or worst_step == "fail"
+
+        evidence: VerdictResult | None = None
+        if should_collect:
+            last_step = scenario["steps"][-1]
+            observations = collect_evidence(plan, registry, step_context(), options)
+            waivers = [
+                EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
+                for waiver in scenario.get("evidenceWaivers", [])
+            ]
+            evidence = evaluate_verdict(
+                policy, last_step.get("polarity", "nominal"), observations, waivers
+            )
+    finally:
+        # Runs whether the steps passed, failed or raised; a raise then
+        # continues to propagate once the leftovers have been dealt with.
+        for cleanup_step in scenario.get("cleanup", []):
+            cleanup_results.append(_run_cleanup_step(cleanup_step, registry, step_context()))
+            step_scope.update(cleanup_results[-1].produced)
+
+    verdicts: list[Verdict] = [worst_step]
+    if evidence is not None:
+        verdicts.append(evidence.verdict)
+    # Cleanup can only make the verdict less certain, never fail the scenario.
+    if any(_cleanup_did_not_succeed(result) for result in cleanup_results):
+        verdicts.append("inconclusive")
 
     return ScenarioRunResult(
         scenario_id=scenario["id"],
         preparation=preparation,
         steps=step_results,
         evidence=evidence,
-        verdict=verdict,
+        verdict=worst_verdict(verdicts),
+        cleanup=cleanup_results,
     )
+
+
+def _cleanup_did_not_succeed(result: StepRunResult) -> bool:
+    """Whether a cleanup step failed to complete or broke an expectation."""
+    return (
+        result.error is not None
+        or (result.action is not None and not result.action.ok)
+        or result.verdict != "pass"
+    )
+
+
+def _run_cleanup_step(
+    step: dict[str, Any], registry: ExecutorRegistry, context: ExecutionContext
+) -> StepRunResult:
+    """Runs a cleanup step, recording anything it raises so later steps still run."""
+    try:
+        result = run_step(step, registry, context)
+    except Exception as cause:
+        return StepRunResult(
+            step_id=step["id"], expectations=[], verdict="inconclusive", error=str(cause)
+        )
+    # run_step's expectations-only verdict ignores an action that did not
+    # complete; for cleanup that is exactly the failure worth reporting.
+    if result.action is not None and not result.action.ok and result.verdict == "pass":
+        return replace(result, verdict="inconclusive")
+    return result
