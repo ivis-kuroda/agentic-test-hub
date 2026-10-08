@@ -43,6 +43,17 @@ describe("loadManifest", () => {
     expect(requiredEnv).toEqual(["DISPATCH_API_URL", "DISPATCH_DB_URL", "DISPATCH_UI_URL"]);
   });
 
+  it("accepts evidence redaction rules and fills their defaults", () => {
+    const { manifest } = loadManifest(`${sampleManifest}\nredact:\n  headers: ["x-session-.*"]\n`);
+    expect(manifest.redact).toEqual({ headers: ["x-session-.*"], patterns: [] });
+  });
+
+  it("rejects a redaction pattern that is not a regular expression", () => {
+    expect(() => loadManifest(`${sampleManifest}\nredact:\n  patterns: ["(unclosed"]\n`)).toThrow(
+      PluginLoadError,
+    );
+  });
+
   it("rejects text that is not YAML", () => {
     expect(() => loadManifest("key: [unclosed")).toThrow(PluginLoadError);
   });

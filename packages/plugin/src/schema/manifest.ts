@@ -6,6 +6,38 @@ import { Connection } from "./connection.ts";
 import { Operation } from "./operation.ts";
 import { OperationCall, StateProvider } from "./state.ts";
 
+/** Whether `source` compiles as a regular expression. */
+function compiles(source: string): boolean {
+  try {
+    new RegExp(source);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What to mask before evidence is written to disk, beyond the built-in rules.
+ *
+ * Saved evidence is meant to be passed around for review, so secrets must not
+ * ride along. The hub always masks the values of the `Authorization`,
+ * `Cookie`, `Set-Cookie`, `Proxy-Authorization` and `X-API-Key` headers and
+ * bearer-style tokens wherever they appear. A target with its own secret
+ * headers or secret-looking text declares them here.
+ */
+export const RedactRules = z.object({
+  /** Regular expressions matched, case-insensitively, against whole header names. */
+  headers: z
+    .array(z.string().min(1).refine(compiles, "not a valid regular expression"))
+    .default([]),
+  /** Regular expressions whose matches are masked in bodies and header values. */
+  patterns: z
+    .array(z.string().min(1).refine(compiles, "not a valid regular expression"))
+    .default([]),
+});
+/** What to mask before evidence is written to disk, beyond the built-in rules. */
+export type RedactRules = z.infer<typeof RedactRules>;
+
 /** Manifest format this hub understands. */
 export const PLUGIN_API_VERSION = "1";
 
@@ -43,6 +75,8 @@ export const PluginManifest = z.object({
    * equivalent to everything being fine.
    */
   evidence: z.partialRecord(EvidenceSource, OperationCall).default({}),
+  /** Extra masking applied to saved evidence (Python runtime). */
+  redact: RedactRules.optional(),
   /** Replaces the default verdict policy for this target. */
   policy: VerdictPolicy.optional(),
 });
