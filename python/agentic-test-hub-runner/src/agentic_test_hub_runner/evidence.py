@@ -5,6 +5,7 @@ Turning what an operation (or a live browser session) produced into
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from dataclasses import dataclass, field
@@ -53,6 +54,42 @@ def collector_extension(text: str) -> str:
     except ValueError:
         return "txt"
     return "json"
+
+
+def normalise_for_diff(text: str) -> list[str]:
+    """Lines of a collector's output for diffing: JSON is pretty-printed with
+    sorted keys, so one-line JSON bodies still diff field by field."""
+    try:
+        text = json.dumps(json.loads(text), indent=2, sort_keys=True, ensure_ascii=False)
+    except ValueError:
+        pass
+    return text.splitlines()
+
+
+def unified_diff(before: str, after: str) -> str:
+    """A unified text diff of two collector outputs; says so when they match."""
+    lines = list(
+        difflib.unified_diff(
+            normalise_for_diff(before),
+            normalise_for_diff(after),
+            fromfile="before",
+            tofile="after",
+            lineterm="",
+        )
+    )
+    return "\n".join(lines) + "\n" if lines else "no differences\n"
+
+
+def added_lines(before: str, after: str) -> str:
+    """The lines of `after` that `before` did not have, in order. For an
+    append-only log this is exactly what was logged in between."""
+    after_lines = after.splitlines()
+    matcher = difflib.SequenceMatcher(a=before.splitlines(), b=after_lines, autojunk=False)
+    added: list[str] = []
+    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
+        if tag in ("insert", "replace"):
+            added.extend(after_lines[j1:j2])
+    return "\n".join(added)
 
 
 def observe_from_result(

@@ -19,6 +19,7 @@ from .registry import ExecutorRegistry
 from .run_case import (
     ExpectationOutcome,
     RunOptions,
+    collect_before,
     collect_evidence,
     compose_verdict,
     evidence_index_of,
@@ -173,7 +174,9 @@ def run_scenario(
             scopes={**context.scopes, "step": {**(context.scopes.get("step") or {}), **step_scope}},
         )
 
+    plan = scenario.get("evidence") or _DEFAULT_EVIDENCE_PLAN
     try:
+        before = collect_before(plan, registry, step_context())
         for step in scenario["steps"]:
             depends_on = step.get("dependsOn", [])
             unmet = next((dep for dep in depends_on if dep not in passed_steps), None)
@@ -195,13 +198,12 @@ def run_scenario(
             step_scope.update(result.produced)
 
         worst_step = worst_verdict([result.verdict for result in step_results])
-        plan = scenario.get("evidence") or _DEFAULT_EVIDENCE_PLAN
         should_collect = plan.get("timing") != "on_failure" or worst_step == "fail"
 
         evidence: VerdictResult | None = None
         if should_collect:
             last_step = scenario["steps"][-1]
-            observations = collect_evidence(plan, registry, step_context(), options)
+            observations = collect_evidence(plan, registry, step_context(), options, before)
             waivers = [
                 EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
                 for waiver in scenario.get("evidenceWaivers", [])

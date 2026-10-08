@@ -19,7 +19,7 @@ after its own `applyOverrides` call returns.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from .assertion import AssertionOutcome
@@ -27,11 +27,14 @@ from .evidence import (
     COLLECTED_BY_OPERATION,
     BrowserSession,
     ObserveOptions,
+    added_lines,
     collector_extension,
     collector_text,
     observe_browser,
     observe_from_result,
+    unified_diff,
 )
+from .evidence_store import Phase
 from .expectation import check_expectation
 from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
@@ -104,8 +107,81 @@ class CaseRunResult:
     """Path of this run's `index.json` when evidence was saved, else `None`."""
 
 
+def wants_before(plan: dict[str, Any], context: ExecutionContext) -> bool:
+    """
+    Whether collectors are read before the action as well as after.
+
+    Always for `timing: before_and_after`. Also whenever evidence is being
+    saved (unless the plan says `on_failure`, which cannot know before the
+    action whether anything will fail), because the owner wants every saved
+    run to show the data and logs before and after. `before`, `after` and
+    `each_step` therefore all behave as before-and-after when saving, and as
+    after-only otherwise; `each_step` is not implemented in Python.
+    """
+    timing = plan.get("timing", "after")
+    if timing == "before_and_after":
+        return True
+    return context.evidence is not None and timing != "on_failure"
+
+
+def _collector_params(call: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    # A collector's params may reference the run's own scopes (for example
+    # `{{run.startedAt}}` to read only what this run logged).
+    return render_deep(call.get("params", {}), context.scopes)
+
+
+def _save_output(
+    context: ExecutionContext, phase: Phase, source: str, name: str, result: ExecutionResult
+) -> str:
+    text = collector_text(result)
+    if context.evidence is not None:
+        context.evidence.save(
+            phase=phase,
+            source=source,
+            name=name,
+            data=text,
+            ext=collector_extension(text),
+        )
+    return text
+
+
+def collect_before(
+    plan: dict[str, Any], registry: ExecutorRegistry, context: ExecutionContext
+) -> dict[str, ExecutionResult]:
+    """
+    Reads the collector channels before the action, saving each output as
+    `before-...` evidence. A collector that cannot be read is skipped with a
+    warning in the evidence index: a missing "before" must not break a run
+    (the verdict falls back to judging the whole "after" output).
+
+    @returns: The outputs by source, for `collect_evidence` to diff against.
+    """
+    results: dict[str, ExecutionResult] = {}
+    if not wants_before(plan, context):
+        return results
+    for source in COLLECTED_BY_OPERATION:
+        call = context.manifest.evidence.get(source)
+        if source not in plan.get("sources", []) or call is None:
+            continue
+        try:
+            result = registry.run(call["operation"], _collector_params(call, context), context)
+        except Exception as cause:
+            if context.evidence is not None:
+                context.evidence.store.warn(
+                    f"could not collect {source} before the action: {cause}"
+                )
+            continue
+        results[source] = result
+        _save_output(context, "before", source, call["operation"], result)
+    return results
+
+
 def collect_evidence(
-    plan: dict[str, Any], registry: ExecutorRegistry, context: ExecutionContext, options: RunOptions
+    plan: dict[str, Any],
+    registry: ExecutorRegistry,
+    context: ExecutionContext,
+    options: RunOptions,
+    before: dict[str, ExecutionResult] | None = None,
 ) -> list[Observation]:
     """
     Collects the evidence a plan calls for.
@@ -114,7 +190,13 @@ def collect_evidence(
     collector operation; `browser_console`/`browser_network` come from a
     live session (never opened or closed here); `screenshot` is never
     gathered here, same limitation as the TypeScript original.
+
+    @param before: Outputs from `collect_before`. When present, a unified
+        diff of before and after is saved next to them, and with
+        `timing: before_and_after` the `app_log` verdict reads only the lines
+        added since `before`.
     """
+    before = before or {}
     observations: list[Observation] = []
     if options.browser_session is not None:
         observations.extend(observe_browser(options.browser_session, options.observe))
@@ -124,19 +206,28 @@ def collect_evidence(
         call = context.manifest.evidence.get(source)
         if call is None:
             continue
-        # A collector's params may reference the run's own scopes (for example
-        # `{{run.startedAt}}` to read only what this run logged).
-        params = render_deep(call.get("params", {}), context.scopes)
-        result = registry.run(call["operation"], params, context)
-        observations.append(observe_from_result(source, result, options.observe))
-        if context.evidence is not None:
-            text = collector_text(result)
+        result = registry.run(call["operation"], _collector_params(call, context), context)
+        judged = result
+        before_result = before.get(source)
+        if (
+            source == "app_log"
+            and plan.get("timing") == "before_and_after"
+            and before_result is not None
+            and before_result.ok
+            and result.ok
+        ):
+            delta = added_lines(collector_text(before_result), collector_text(result))
+            judged = replace(result, stdout=delta, stderr=None)
+        observations.append(observe_from_result(source, judged, options.observe))
+        after_text = _save_output(context, "after", source, call["operation"], result)
+        if before_result is not None and context.evidence is not None:
             context.evidence.save(
                 phase="after",
                 source=source,
                 name=call["operation"],
-                data=text,
-                ext=collector_extension(text),
+                data=unified_diff(collector_text(before_result), after_text),
+                ext="diff",
+                role="diff",
             )
     return observations
 
@@ -200,6 +291,9 @@ def run_case(
     if action_ref is None:
         raise ValueError(f"case {test_case['id']}'s baseline declares no action to run")
 
+    plan = test_case.get("evidence") or _DEFAULT_EVIDENCE_PLAN
+    before = collect_before(plan, registry, context)
+
     action = registry.run(action_ref["operation"], action_params, context)
 
     expectations: list[ExpectationOutcome] = []
@@ -212,8 +306,7 @@ def run_case(
             ExpectationOutcome(expectation, check_expectation(expectation, subject))
         )
 
-    plan = test_case.get("evidence") or _DEFAULT_EVIDENCE_PLAN
-    observations = collect_evidence(plan, registry, context, options)
+    observations = collect_evidence(plan, registry, context, options, before)
     waivers = [
         EvidenceWaiver(source=waiver["source"], reason=waiver["reason"])
         for waiver in test_case.get("evidenceWaivers", [])

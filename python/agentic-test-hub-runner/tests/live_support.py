@@ -48,9 +48,9 @@ document.querySelector('[data-testid=submit]').onclick = async () => {
 class LiveState:
     """What the throwaway server holds: notifications and a log."""
 
-    def __init__(self) -> None:
+    def __init__(self, log: list[str] | None = None) -> None:
         self.notifications: list[dict[str, Any]] = []
-        self.log: list[str] = ["boot ok"]
+        self.log: list[str] = list(log) if log is not None else ["boot ok"]
         self.db_log: list[str] = ["db ready"]
 
 
@@ -91,6 +91,8 @@ def _handler(state: LiveState) -> type[BaseHTTPRequestHandler]:
             state.notifications.append(record)
             # A careless service logging the credential it was given.
             state.log.append(f"accepted notification {record['id']} auth={auth}")
+            if "ERROR" in str(payload.get("recipient", "")):
+                state.log.append(f"ERROR while handling {payload['recipient']}")
             state.db_log.append(f"INSERT notification {record['id']}")
             self._send(
                 201,
@@ -103,9 +105,12 @@ def _handler(state: LiveState) -> type[BaseHTTPRequestHandler]:
 
 
 @contextmanager
-def live_server() -> Iterator[tuple[str, LiveState]]:
-    """Runs the throwaway server for the length of the block; yields (base_url, state)."""
-    state = LiveState()
+def live_server(log: list[str] | None = None) -> Iterator[tuple[str, LiveState]]:
+    """Runs the throwaway server for the length of the block; yields (base_url, state).
+
+    @param log: Application log lines already present when the server starts.
+    """
+    state = LiveState(log)
     server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(state))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
