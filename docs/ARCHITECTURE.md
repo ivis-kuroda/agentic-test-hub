@@ -225,6 +225,25 @@ accepts the camelCase names from YAML and maps them to snake_case.
   dependants are skipped as inconclusive. A plain-path entry that is absent
   is unchanged: it produces nothing, and a later `{{step.name}}` fails loudly.
 
+## Params are rendered before they are used
+
+Every `params` map a spec hands to an operation (a baseline's or a step's
+`action.params`, an `operation_result` expectation, a state's `ensure`/`verify`
+and an evidence collector's own `params`) is rendered by the registry before it
+joins the `param` scope. Every string inside it, nested values and keys
+included, is rendered with the current `env`, `step`, `run` and already-present
+`param` scopes. So a spec can write `token: "{{env.API_TOKEN}}"` and a later
+scenario step can write `recid: "{{step.recid}}"`. A string that is only one
+placeholder keeps a non-scalar value as it is. An unresolved placeholder fails
+the run with an `ExecutorError` naming the operation, the param and the
+placeholder.
+
+Generated tests embed a case's action params as written, so placeholders reach
+run time untouched and are rendered there. A secret that arrives this way is
+still masked in saved evidence, because masking learns the credential values a
+run sends. The operation's own templates (`{{param.name}}` in a path, header or
+body) work as before and see the rendered values.
+
 ## Cleanup and the `run` scope
 
 A scenario's `cleanup: [Step]` (a cleanup step's `expect` may be empty) always
