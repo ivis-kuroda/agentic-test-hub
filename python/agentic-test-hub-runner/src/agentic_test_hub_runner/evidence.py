@@ -5,6 +5,7 @@ Turning what an operation (or a live browser session) produced into
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -32,6 +33,26 @@ def _compile(patterns: list[str]) -> list[re.Pattern[str]]:
         except re.error:
             continue
     return compiled
+
+
+def collector_text(result: ExecutionResult) -> str:
+    """The text of a collector's output: stdout and stderr, else its rows (one
+    JSON object per line), else its failure message."""
+    if not result.ok:
+        return f"collection failed: {result.failure or 'unknown reason'}\n"
+    text = "\n".join(part for part in (result.stdout or "", result.stderr or "") if part)
+    if not text and result.rows is not None:
+        text = "\n".join(json.dumps(row, sort_keys=True, default=str) for row in result.rows)
+    return text
+
+
+def collector_extension(text: str) -> str:
+    """`json` when the collector's output parses as JSON, else `txt`."""
+    try:
+        json.loads(text)
+    except ValueError:
+        return "txt"
+    return "json"
 
 
 def observe_from_result(

@@ -18,6 +18,7 @@ after its own `applyOverrides` call returns.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,13 +27,15 @@ from .evidence import (
     COLLECTED_BY_OPERATION,
     BrowserSession,
     ObserveOptions,
+    collector_extension,
+    collector_text,
     observe_browser,
     observe_from_result,
 )
 from .expectation import check_expectation
 from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
-from .run_scope import with_run_scope
+from .run_scope import with_evidence_target, with_run_scope
 from .state import PreparationReport, prepare_states
 from .template import render_deep
 from .types import ExecutionContext, ExecutionResult
@@ -81,6 +84,9 @@ class RunOptions:
     browser_session: BrowserSession | None = None
     policy: VerdictPolicy | None = None
     observe: ObserveOptions | None = None
+    evidence_dir: str | os.PathLike[str] | None = None
+    """Where to save evidence files; falls back to the `ATH_EVIDENCE_DIR`
+    environment variable, and `None` with the variable unset saves nothing."""
 
 
 @dataclass(frozen=True)
@@ -94,6 +100,8 @@ class CaseRunResult:
     observations: list[Observation]
     evidence: VerdictResult
     verdict: Verdict
+    evidence_index: str | None = None
+    """Path of this run's `index.json` when evidence was saved, else `None`."""
 
 
 def collect_evidence(
@@ -121,6 +129,15 @@ def collect_evidence(
         params = render_deep(call.get("params", {}), context.scopes)
         result = registry.run(call["operation"], params, context)
         observations.append(observe_from_result(source, result, options.observe))
+        if context.evidence is not None:
+            text = collector_text(result)
+            context.evidence.save(
+                phase="after",
+                source=source,
+                name=call["operation"],
+                data=text,
+                ext=collector_extension(text),
+            )
     return observations
 
 
@@ -161,7 +178,9 @@ def run_case(
         action, from `deriveActionParams` at generation time.
     """
     options = options or RunOptions()
-    context = with_run_scope(context)
+    context = with_evidence_target(
+        with_run_scope(context), options.evidence_dir, test_case["id"], "case"
+    )
     policy = options.policy or context.manifest.policy or DEFAULT_VERDICT_POLICY
 
     preparation = prepare_states(resolved.get("preconditions", []), registry, context)
@@ -174,6 +193,7 @@ def run_case(
             observations=[],
             evidence=evaluate_verdict(policy, test_case.get("polarity", "nominal"), []),
             verdict="inconclusive",
+            evidence_index=evidence_index_of(context),
         )
 
     action_ref = resolved.get("action")
@@ -208,4 +228,10 @@ def run_case(
         observations=observations,
         evidence=evidence,
         verdict=compose_verdict(expectations, evidence),
+        evidence_index=evidence_index_of(context),
     )
+
+
+def evidence_index_of(context: ExecutionContext) -> str | None:
+    """Path of the run's `index.json`, or `None` when evidence is not being saved."""
+    return str(context.evidence.store.index_path) if context.evidence is not None else None

@@ -21,9 +21,10 @@ from .run_case import (
     RunOptions,
     collect_evidence,
     compose_verdict,
+    evidence_index_of,
     worst_verdict,
 )
-from .run_scope import with_run_scope
+from .run_scope import with_evidence_target, with_run_scope
 from .state import PreparationReport, prepare_states
 from .types import ExecutionContext, ExecutionResult
 from .verdict import EvidenceWaiver, Verdict, VerdictResult, evaluate_verdict
@@ -120,6 +121,8 @@ class ScenarioRunResult:
     evidence: VerdictResult | None = None
     cleanup: list[StepRunResult] = field(default_factory=list)
     """The cleanup steps, in order; empty when there were none or preparation failed."""
+    evidence_index: str | None = None
+    """Path of this run's `index.json` when evidence was saved, else `None`."""
 
 
 def run_scenario(
@@ -144,12 +147,20 @@ def run_scenario(
     scope (`startedAt`, `id`) is added to `context` unless it has one.
     """
     options = options or RunOptions()
-    context = with_run_scope(context)
+    context = with_evidence_target(
+        with_run_scope(context), options.evidence_dir, scenario["id"], "scenario"
+    )
     policy: VerdictPolicy = options.policy or context.manifest.policy or DEFAULT_VERDICT_POLICY
 
     preparation = prepare_states(scenario.get("preconditions", []), registry, context)
     if not preparation.ready:
-        return ScenarioRunResult(scenario["id"], preparation, [], verdict="inconclusive")
+        return ScenarioRunResult(
+            scenario["id"],
+            preparation,
+            [],
+            verdict="inconclusive",
+            evidence_index=evidence_index_of(context),
+        )
 
     step_scope: dict[str, Any] = {}
     step_results: list[StepRunResult] = []
@@ -219,6 +230,7 @@ def run_scenario(
         evidence=evidence,
         verdict=worst_verdict(verdicts),
         cleanup=cleanup_results,
+        evidence_index=evidence_index_of(context),
     )
 
 

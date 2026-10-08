@@ -6,9 +6,12 @@ Everything an executor needs besides the operation itself, mirroring
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .manifest import Manifest
+
+if TYPE_CHECKING:
+    from .evidence_store import EvidenceTarget
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,8 @@ class ExecutionContext:
     """Values available to interpolation (`env`/`param`/`step`/`run`)."""
     root: str = "."
     """Plugin repository root, which relative paths are resolved against."""
+    evidence: EvidenceTarget | None = None
+    """Where this run saves evidence files; `None` when saving is disabled."""
 
 
 @dataclass(frozen=True)
