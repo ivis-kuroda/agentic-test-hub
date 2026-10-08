@@ -225,11 +225,68 @@ already supplied one: `{{run.startedAt}}` (UTC ISO-8601, seconds, `Z`) and
 rendered with the context scopes, so a collector can read only what this run
 produced, for example `since: "{{run.startedAt}}"`.
 
+## Saved evidence
+
+Judging a verdict reads evidence in memory; a reviewer also needs the files.
+The Python runner saves them when `ATH_EVIDENCE_DIR` is set (or
+`RunOptions.evidence_dir` is passed). Unset, nothing is written and nothing
+else changes. Generated tests need no edit: options come from the
+environment.
+
+```
+<ATH_EVIDENCE_DIR>/<run-id>/index.json
+<ATH_EVIDENCE_DIR>/<run-id>/<entity-id>/<location>/<phase>-<kind>-<name>.<ext>
+```
+
+`<run-id>` is `{{run.id}}`. `<location>` is `case`, `scenario` (collected
+around all steps), `NN-<step-id>` or `cleanup-NN-<step-id>`. `<phase>` is
+`before`, `after` or `during` (an http exchange); `diff-...` files are the
+unified diff of a before/after pair. Repeated names get `-2`, `-3`.
+
+| Kind | Evidence | Files |
+|---|---|---|
+| 1 | screenshot | `{before,after}-screenshot-<op>.png` per browser operation |
+| 2 | browser console + network, or API request/response | `after-console-<op>.json`, `after-network-<op>.json` (with a 16 KiB `response_body_preview` for non-GET xhr/fetch); `during-network-http-<op>.json` per http call |
+| 3 | DB records before/after | `{before,after,diff}-db-records-<collector op>` |
+| 4 | application log | `{before,after,diff}-app-log-<collector op>` |
+| 5 | DB log | `{before,after,diff}-db-log-<collector op>` |
+
+`index.json` is rewritten atomically after every file, so it is always valid:
+`{schemaVersion, runId, startedAt, entries[], warnings[]}`. An entry has
+`kind` (1-5), `source` (the channel: `screenshot`, `browser_console`,
+`browser_network`, `http_exchange`, `db_records`, `app_log`, `db_log`),
+`path` (relative to the run directory), `capturedAt` (UTC), `phase`, `role`
+(`capture` or `diff`), `entity`, `step` (id or null), `bytes` and `sha256`.
+Saving never fails a run: a write error becomes a `warnings` entry.
+
+**Timing.** Collector channels (kinds 3-5) are read before the action and
+after it whenever evidence is being saved (except `timing: on_failure`), so
+`before`, `after` and `each_step` all save before and after; `each_step` is
+otherwise ignored in Python. `timing: before_and_after` additionally judges
+`app_log` on the lines added since the before read (whole output when either
+read failed); with any other timing the verdict still reads the whole
+after output. The TypeScript runner does not save evidence and treats
+`before_and_after` as `after`.
+
+**Browser.** A `BrowserExecutor` keeps the last session it opened until the
+run ends (`registry.close_all()`, called by `run_case`/`run_scenario` in a
+`finally`) and the runner reads that session's console and network for the
+verdict, so a policy binding `browser_console` now sees real page errors.
+
+**Masking.** Everything text written is masked first. Values of the
+`Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization` and
+`X-API-Key` headers (any case) and of headers matching the manifest's
+`redact.headers` regexes become `***REDACTED***`. `Bearer`/`Basic`
+credentials, any secret value the run sent in such a header, and matches of
+`redact.patterns` are masked in bodies, logs and header values. Multipart
+requests record part names, filenames, content types and sizes, never file
+bytes. The in-memory `ExecutionResult` is unchanged.
+
 ## Runtime parity
 
 Python is the primary runtime; the TypeScript runner mirrors it where the
-shared schema types force it. Everything above except `multipart` runs on
-both. `ath-generate-test --lang typescript` refuses a plan that uses a
+shared schema types force it. Everything above except `multipart` and saving
+evidence to disk runs on both. `ath-generate-test --lang typescript` refuses a plan that uses a
 Python-only feature (`pythonOnlyFeatures` in `packages/cli/src/plan.ts`,
 alongside the unsupported-executor check) and says to use `--lang python`.
 Add a feature there when it cannot be implemented in the TypeScript runner.

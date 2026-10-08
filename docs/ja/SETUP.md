@@ -115,6 +115,21 @@ pnpm e2e
 pnpm e2e:report   # 直近の実行結果をブラウザで見る
 ```
 
+### 証跡をファイルに保存する（Python実行時）
+
+環境変数 `ATH_EVIDENCE_DIR` を指定してPythonで生成したテストを実行すると、実行ごとに証跡が保存される。
+未指定なら何も保存されず、動作も変わらない。
+
+```bash
+ATH_EVIDENCE_DIR=./evidence pytest generated/test_tc_xxx.py
+# → evidence/<実行ID>/<ケースID>/case/before-db-records-….json など
+```
+
+保存されるのは、スクリーンショット、ブラウザのコンソールとネットワーク（API試験はリクエスト/レスポンス）、
+DBレコードの実行前後と差分、アプリケーションログ、DBログ。一覧は `evidence/<実行ID>/index.json` にある。
+Authorization・Cookie などの秘密情報は `***REDACTED***` に置き換えて保存される。
+詳細は [docs/ARCHITECTURE.md](../ARCHITECTURE.md) の「Saved evidence」を参照。
+
 ## 7. 一括チェック（コミット前）
 
 ```bash
