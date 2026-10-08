@@ -72,6 +72,13 @@ the thing is for, what the caller is responsible for, and anything surprising.
   - `docs/ja/SETUP.md` — how to run this locally: install, start the web
     editor, generate the reviewer view and delivery workbook, run the tests.
 
+## Skills
+
+`.claude/skills/`: `generate-spec` (draft specs from design docs/code),
+`generate-test` (reviewed specs to committed test code), `triage-run-result`
+(classify non-passes, record results), `write-handoff` (continue on another
+machine).
+
 ## Working agreement
 
 The project owner has explicitly opted into fast, autonomous development.
