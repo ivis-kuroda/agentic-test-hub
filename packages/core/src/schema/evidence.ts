@@ -35,6 +35,13 @@ export const CaptureTiming = z.enum([
   "before",
   /** Once after the action. */
   "after",
+  /**
+   * Before and after the action. Collector channels (DB records, logs) are
+   * read at both moments, both outputs are kept, and a diff of the two is
+   * saved so a reviewer sees what the action changed. Python runtime only
+   * implements the saving; the TypeScript runner treats it as `after`.
+   */
+  "before_and_after",
   /** Around every step, for scenarios where intermediate state matters. */
   "each_step",
   /** Only when something failed, to keep passing runs cheap. */

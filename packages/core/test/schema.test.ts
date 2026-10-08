@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TestCase } from "../src/schema/case.ts";
-import { DEFAULT_EVIDENCE_PLAN } from "../src/schema/evidence.ts";
+import { DEFAULT_EVIDENCE_PLAN, EvidencePlan } from "../src/schema/evidence.ts";
 import { Expectation, isMechanical } from "../src/schema/expectation.ts";
 import { Factor } from "../src/schema/factor.ts";
 import { CaseId, StateRef, ViewpointId } from "../src/schema/id.ts";
@@ -191,5 +191,9 @@ describe("evidence defaults", () => {
 
   it("keeps traces for failures only, since they are large", () => {
     expect(DEFAULT_EVIDENCE_PLAN.trace).toBe("on_failure");
+  });
+
+  it("accepts before_and_after as a capture timing", () => {
+    expect(EvidencePlan.parse({ timing: "before_and_after" }).timing).toBe("before_and_after");
   });
 });

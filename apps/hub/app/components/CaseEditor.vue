@@ -25,7 +25,7 @@ export interface CaseDraft {
   polarity: "nominal" | "error";
   evidenceEnabled: boolean;
   evidenceSources: string[];
-  evidenceTiming: "before" | "after" | "each_step" | "on_failure";
+  evidenceTiming: "before" | "after" | "before_and_after" | "each_step" | "on_failure";
   evidenceTrace: "always" | "on_failure" | "never";
   evidenceIgnore: string[];
   evidenceWaivers: { source: string; reason: string }[];
@@ -76,6 +76,7 @@ const evidenceSourceItems = [
 const timingItems = [
   { label: "before", value: "before" as const },
   { label: "after", value: "after" as const },
+  { label: "before and after", value: "before_and_after" as const },
   { label: "each step", value: "each_step" as const },
   { label: "on failure", value: "on_failure" as const },
 ];

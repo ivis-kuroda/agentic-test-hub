@@ -130,7 +130,8 @@ export interface ScenarioRunResult {
  *
  * v1 collects evidence once, after the last step, honouring
  * `EvidencePlan.timing` only as `"after"` (the default) or `"on_failure"` —
- * `"before"` and `"each_step"` are a deliberate follow-up; no scenario in
+ * `"before_and_after"` is treated as `"after"` (only the Python runtime saves
+ * before/after evidence); `"before"` and `"each_step"` are a deliberate follow-up; no scenario in
  * this suite uses them yet.
  *
  * A scenario has no top-level polarity (only its steps do), so evidence is
