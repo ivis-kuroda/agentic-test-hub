@@ -105,7 +105,7 @@ def test_generated_case_saves_collector_output(tmp_path: Path) -> None:
     run_dir, index = load_index(evidence_root)
     paths = {entry["path"] for entry in index["entries"]}
     # Saving evidence also reads the collectors before the action.
-    assert paths == {
+    assert paths >= {
         f"TC-LIVE-001/case/{phase}-{word}-{op}.{ext}"
         for phase in ("before", "after")
         for word, op, ext in (
@@ -121,9 +121,12 @@ def test_generated_case_saves_collector_output(tmp_path: Path) -> None:
             ("db-log", "OP-READ-DB-LOG"),
         )
     }
+    # Every http call is recorded as well: the action and each collector read.
+    assert "TC-LIVE-001/case/during-network-http-OP-SEND.json" in paths
+    assert "TC-LIVE-001/case/during-network-http-OP-READ-LOGS-2.json" in paths
     logged = (run_dir / "TC-LIVE-001/case/after-app-log-OP-READ-LOGS.txt").read_text()
     assert "accepted notification 1" in logged
-    assert {entry["kind"] for entry in index["entries"]} == {3, 4, 5}
+    assert {entry["kind"] for entry in index["entries"]} == {2, 3, 4, 5}
 
 
 @requires_cli

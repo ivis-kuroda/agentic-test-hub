@@ -11,6 +11,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from .evidence_store import open_evidence_store
+from .redaction import Redactor
 from .types import ExecutionContext
 
 
@@ -46,7 +47,11 @@ def with_evidence_target(
     """
     if context.evidence is not None:
         return context
-    store = open_evidence_store(context.scopes.get("run"), evidence_dir)
+    store = open_evidence_store(
+        context.scopes.get("run"),
+        evidence_dir,
+        Redactor.from_manifest(context.manifest.redact),
+    )
     if store is None:
         return context
     return replace(context, evidence=store.at(entity_id, location))

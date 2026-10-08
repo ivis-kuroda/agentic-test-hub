@@ -31,6 +31,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from .redaction import Redactor
+
 EVIDENCE_DIR_ENV = "ATH_EVIDENCE_DIR"
 """Environment variable naming the evidence root; unset means evidence is not saved."""
 
@@ -87,8 +89,10 @@ class EvidenceStore:
         root: str | os.PathLike[str],
         run_id: str,
         started_at: str,
+        redactor: Redactor | None = None,
     ) -> None:
         self.run_id = run_id
+        self.redactor = redactor or Redactor()
         self.run_dir = Path(root) / safe_component(run_id)
         self.started_at = started_at
         self._lock = threading.Lock()
@@ -162,7 +166,8 @@ class EvidenceStore:
         """
         Writes one evidence file and indexes it.
 
-        Text is written as UTF-8; bytes (screenshots) as given.
+        Text is masked first (see `redaction.py`) and written as UTF-8; bytes
+        (screenshots) are written as given.
 
         @returns: The path relative to the run directory, or `None` when the
             write failed (a warning is recorded instead of raising).
@@ -170,7 +175,10 @@ class EvidenceStore:
         try:
             kind, word = CHANNELS[source]
             if isinstance(data, str):
-                data = data.encode("utf8")
+                masked = (
+                    self.redactor.json_text(data) if ext == "json" else self.redactor.text(data)
+                )
+                data = masked.encode("utf8")
             prefix = "diff" if role == "diff" else phase
             filename = f"{prefix}-{word}-{safe_component(name)}.{ext.lstrip('.')}"
             with self._lock:
@@ -231,6 +239,7 @@ class EvidenceTarget:
 def open_evidence_store(
     run: dict[str, Any] | None,
     evidence_dir: str | os.PathLike[str] | None = None,
+    redactor: Redactor | None = None,
 ) -> EvidenceStore | None:
     """
     Opens the store for a run, or returns `None` when evidence is disabled.
@@ -238,6 +247,7 @@ def open_evidence_store(
     @param run: The `run` template scope (`id`, `startedAt`); its id names the
         run directory.
     @param evidence_dir: Explicit root; falls back to `ATH_EVIDENCE_DIR`.
+    @param redactor: Masking rules for everything written.
     """
     root = evidence_dir or os.environ.get(EVIDENCE_DIR_ENV)
     if not root:
@@ -247,4 +257,5 @@ def open_evidence_store(
         root,
         str(run.get("id") or uuid.uuid4().hex[:8]),
         str(run.get("startedAt") or _now()),
+        redactor,
     )

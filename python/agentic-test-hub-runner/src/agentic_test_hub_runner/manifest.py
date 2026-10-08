@@ -31,6 +31,8 @@ class Manifest:
     evidence: dict[str, dict[str, Any]]
     policy: dict[str, Any] | None
     extension_module: str | None
+    redact: dict[str, Any] | None = None
+    """Extra masking rules for saved evidence (`headers`, `patterns` regex lists)."""
 
 
 def load_manifest(source: str) -> Manifest:
@@ -49,4 +51,5 @@ def load_manifest(source: str) -> Manifest:
         evidence=raw.get("evidence") or {},
         policy=raw.get("policy"),
         extension_module=raw.get("extensionModule"),
+        redact=raw.get("redact"),
     )

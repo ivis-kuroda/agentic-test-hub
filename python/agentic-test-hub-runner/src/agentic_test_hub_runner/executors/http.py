@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from ..evidence_store import EvidenceTarget
 from ..template import render, render_deep
 from ..types import ExecutionContext, ExecutionResult, ExecutorError
 
@@ -33,6 +34,78 @@ def _references_absent_optional(
         for text in texts
         for name in _PARAM_REFERENCE.findall(text)
     )
+
+
+MAX_BODY_BYTES = 1024 * 1024
+"""How much of a response body an exchange record keeps."""
+
+
+def _describe_multipart(files: list[tuple[str, tuple[Any, ...]]]) -> list[dict[str, Any]]:
+    """Part names, filenames, content types and sizes — never the bytes."""
+    described: list[dict[str, Any]] = []
+    for name, part in files:
+        filename, content = part[0], part[1]
+        content_type = part[2] if len(part) > 2 else None
+        described.append(
+            {
+                "name": name,
+                "filename": None if filename is None else str(filename),
+                "contentType": content_type,
+                "bytes": len(content.encode("utf8") if isinstance(content, str) else content),
+            }
+        )
+    return described
+
+
+def _parsed_or_text(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
+
+
+def _record_exchange(
+    target: EvidenceTarget,
+    operation_id: str,
+    request: dict[str, Any],
+    response: httpx.Response | None,
+    duration_ms: float,
+    failure: str | None,
+) -> None:
+    """Saves one request/response as kind-2 `network` evidence; never raises."""
+    try:
+        redactor = target.store.redactor
+        record: dict[str, Any] = {
+            "operation": operation_id,
+            "method": request["method"],
+            "url": request["url"],
+            "durationMs": round(duration_ms, 1),
+            "request": {
+                "headers": redactor.headers(request["headers"]),
+                "body": None if request["body"] is None else _parsed_or_text(request["body"]),
+                "multipart": request["multipart"],
+            },
+            "response": None,
+            "failure": failure,
+        }
+        if response is not None:
+            text = response.text
+            kept = text[:MAX_BODY_BYTES]
+            record["response"] = {
+                "status": response.status_code,
+                "headers": redactor.headers(dict(response.headers.items())),
+                "body": _parsed_or_text(kept) if text == kept else kept,
+                "truncated": text != kept,
+            }
+        target.save(
+            phase="during",
+            source="http_exchange",
+            name=f"http-{operation_id}",
+            data=json.dumps(record, indent=2, ensure_ascii=False),
+            ext="json",
+        )
+    except Exception as cause:
+        target.store.warn(f"could not record the http exchange of {operation_id}: {cause}")
 
 
 class _EmptyFilename(str):
@@ -162,6 +235,14 @@ class HttpExecutor:
         elif payload is not None and "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
 
+        recorded = {
+            "method": method,
+            "url": url,
+            "headers": headers,
+            "body": payload if files is None else None,
+            "multipart": None if files is None else _describe_multipart(files),
+        }
+        operation_id = operation.get("id", operation["connection"])
         started = time.monotonic()
         try:
             response = self._client.request(
@@ -172,6 +253,19 @@ class HttpExecutor:
                 files=files,
                 timeout=operation.get("timeoutMs", 60_000) / 1000,
             )
+            if context.evidence is not None:
+                try:  # the wire headers include what the client added itself
+                    recorded["headers"] = dict(response.request.headers.items())
+                except RuntimeError:  # a response without its request (test doubles)
+                    pass
+                _record_exchange(
+                    context.evidence,
+                    operation_id,
+                    recorded,
+                    response,
+                    (time.monotonic() - started) * 1000,
+                    None,
+                )
             text = response.text
             try:
                 body_value: Any = response.json() if text else None
@@ -187,6 +281,15 @@ class HttpExecutor:
                 stdout=text,
             )
         except httpx.HTTPError as cause:
+            if context.evidence is not None:
+                _record_exchange(
+                    context.evidence,
+                    operation_id,
+                    recorded,
+                    None,
+                    (time.monotonic() - started) * 1000,
+                    f"request did not complete: {cause}",
+                )
             return ExecutionResult(
                 operation=f"{method} {url}",
                 ok=False,

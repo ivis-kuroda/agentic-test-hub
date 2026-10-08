@@ -90,7 +90,8 @@ def _handler(state: LiveState) -> type[BaseHTTPRequestHandler]:
             record = {"id": len(state.notifications) + 1, **payload}
             state.notifications.append(record)
             # A careless service logging the credential it was given.
-            state.log.append(f"accepted notification {record['id']} auth={auth}")
+            token = auth.removeprefix("Bearer ")
+            state.log.append(f"accepted notification {record['id']} auth={auth} token={token}")
             if "ERROR" in str(payload.get("recipient", "")):
                 state.log.append(f"ERROR while handling {payload['recipient']}")
             state.db_log.append(f"INSERT notification {record['id']}")
