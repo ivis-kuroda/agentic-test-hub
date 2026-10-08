@@ -171,6 +171,18 @@ noise is filtered by pattern so the condition asks whether _this change_
 introduced anything — and suppressed entries are counted, so the allowance
 stays visible rather than quietly growing.
 
+`evidence.ignore` on a case or scenario is a list of regular expressions. It
+applies to every channel that is scanned for problems: `app_log`, `db_log` and
+`db_records` output (matched against each line), browser console messages
+(matched against text and location) and browser network failures (matched
+against the URL). It is merged with any `ObserveOptions.ignore` a caller
+passes in `RunOptions.observe`; both apply. Invalid patterns are dropped.
+
+Collector output is scanned line by line for the words `error`, `exception`,
+`traceback`, `fatal`, `critical` and `constraint violation` (whole words, any
+case). The scan does not look at log levels: a `WARNING` line containing one
+of those words is a problem unless an `ignore` pattern matches it.
+
 ## Judging an action's result
 
 An `Expectation` of kind `result` judges the action's own `ExecutionResult`
