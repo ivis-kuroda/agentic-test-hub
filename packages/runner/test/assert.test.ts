@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { Assertion } from "@agentic-test-hub/core";
+
 import { checkAssertion, subjectOf } from "../src/assert.ts";
 import type { ExecutionResult } from "../src/executor/types.ts";
 
@@ -162,5 +164,80 @@ describe("text output from real commands", () => {
 
   it("reports the trimmed subject, so the message is readable", () => {
     expect(subjectOf(result({ stdout: "3\n" })).value).toBe("3");
+  });
+});
+
+describe("checkAssertion with `at` and the extended kinds", () => {
+  const verdictOf = (assertion: Assertion, over: Partial<ExecutionResult>) =>
+    checkAssertion(assertion, result(over)).verdict;
+
+  it("judges the value `at` selects instead of the default subject", () => {
+    const body = { error: "bad" };
+    expect(verdictOf({ kind: "equals", at: "body.error", value: "bad" }, { body })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "equals", at: "body.error", value: "x" }, { body })).toBe("violated");
+    expect(verdictOf({ kind: "equals", at: "body.missing", value: 1 }, { body })).toBe("violated");
+    expect(verdictOf({ kind: "equals", at: "status", value: 201 }, { status: 201 })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "equals", at: "exitCode", value: 0 }, { exitCode: 0 })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "contains", at: "stdout", value: "ok" }, { stdout: "all ok" })).toBe(
+      "satisfied",
+    );
+    expect(
+      verdictOf({ kind: "contains", at: "body.msg", value: "no" }, { body: { msg: "ok" } }),
+    ).toBe("violated");
+    expect(
+      verdictOf({ kind: "matches", at: "body.id", pattern: "^\\d+$" }, { body: { id: 42 } }),
+    ).toBe("satisfied");
+  });
+
+  it("reads response headers case-insensitively", () => {
+    const headers = { location: "/items/7" };
+    expect(
+      verdictOf({ kind: "matches", at: "headers.Location", pattern: "/items/\\d+$" }, { headers }),
+    ).toBe("satisfied");
+  });
+
+  it("keys compares the key set, ignoring order", () => {
+    const body = { a: 1, b: 2 };
+    expect(verdictOf({ kind: "keys", value: ["b", "a"] }, { body })).toBe("satisfied");
+    expect(verdictOf({ kind: "keys", value: ["a"] }, { body })).toBe("violated");
+    expect(verdictOf({ kind: "keys", value: ["a", "b", "c"] }, { body })).toBe("violated");
+    expect(verdictOf({ kind: "keys", at: "body.x", value: ["k"] }, { body: { x: { k: 1 } } })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "keys", value: ["a"] }, { body: [1] })).toBe("violated");
+  });
+
+  it("one_of accepts any listed value, string/number tolerant", () => {
+    expect(verdictOf({ kind: "one_of", at: "status", values: [200, 204] }, { status: 204 })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "one_of", at: "status", values: ["200"] }, { status: 200 })).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "one_of", at: "status", values: [200, 204] }, { status: 500 })).toBe(
+      "violated",
+    );
+  });
+
+  it("compare coerces the subject to a number", () => {
+    const cmp = (op: "lt" | "lte" | "gt" | "gte", value: number, n: unknown) =>
+      verdictOf({ kind: "compare", op, value, at: "body.n" }, { body: { n } });
+    expect(verdictOf({ kind: "compare", op: "lt", value: 100, at: "durationMs" }, {})).toBe(
+      "satisfied",
+    );
+    expect(verdictOf({ kind: "compare", op: "gt", value: 100, at: "durationMs" }, {})).toBe(
+      "violated",
+    );
+    expect(cmp("lte", 5, "5")).toBe("satisfied");
+    expect(cmp("gte", 5, 4)).toBe("violated");
+    expect(cmp("lt", 5, "abc")).toBe("violated");
+    expect(cmp("lt", 5, "")).toBe("violated");
+    expect(cmp("lt", 5, true)).toBe("violated");
   });
 });

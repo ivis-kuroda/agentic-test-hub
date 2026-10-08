@@ -41,6 +41,8 @@ class ExecutionResult:
     stdout: str | None = None
     stderr: str | None = None
     body: Any = None
+    headers: dict[str, str] | None = None
+    """Response headers, names lower-cased, for requests."""
     rows: list[dict[str, Any]] | None = None
     failure: str | None = None
 

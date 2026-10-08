@@ -60,3 +60,84 @@ def test_matches_a_valid_pattern() -> None:
         check_assertion({"kind": "matches", "pattern": r"order-[a-z]+"}, result).verdict
         == "violated"
     )
+
+
+def _res(**kwargs) -> ExecutionResult:
+    return ExecutionResult(operation="x", ok=True, duration_ms=12.5, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("assertion", "result", "verdict"),
+    [
+        (
+            {"kind": "equals", "at": "body.error", "value": "bad"},
+            _res(body={"error": "bad"}),
+            "satisfied",
+        ),
+        (
+            {"kind": "equals", "at": "body.error", "value": "bad"},
+            _res(body={"error": "x"}),
+            "violated",
+        ),
+        ({"kind": "equals", "at": "body.missing", "value": 1}, _res(body={}), "violated"),
+        ({"kind": "equals", "at": "status", "value": 201}, _res(status=201), "satisfied"),
+        ({"kind": "equals", "at": "exitCode", "value": 0}, _res(exit_code=0), "satisfied"),
+        ({"kind": "equals", "at": "exit_code", "value": 0}, _res(exit_code=0), "satisfied"),
+        ({"kind": "contains", "at": "stdout", "value": "ok"}, _res(stdout="all ok"), "satisfied"),
+        (
+            {"kind": "contains", "at": "body.msg", "value": "no"},
+            _res(body={"msg": "ok"}),
+            "violated",
+        ),
+        (
+            {"kind": "matches", "at": "body.id", "pattern": r"^\d+$"},
+            _res(body={"id": 42}),
+            "satisfied",
+        ),
+        ({"kind": "keys", "value": ["b", "a"]}, _res(body={"a": 1, "b": 2}), "satisfied"),
+        ({"kind": "keys", "value": ["a"]}, _res(body={"a": 1, "b": 2}), "violated"),
+        ({"kind": "keys", "value": ["a", "b"]}, _res(body={"a": 1}), "violated"),
+        ({"kind": "keys", "at": "body.x", "value": ["k"]}, _res(body={"x": {"k": 1}}), "satisfied"),
+        ({"kind": "keys", "value": ["a"]}, _res(body=[1]), "violated"),
+        ({"kind": "one_of", "values": [200, 204], "at": "status"}, _res(status=204), "satisfied"),
+        ({"kind": "one_of", "values": ["200"], "at": "status"}, _res(status=200), "satisfied"),
+        ({"kind": "one_of", "values": [200, 204], "at": "status"}, _res(status=500), "violated"),
+        ({"kind": "compare", "op": "lt", "value": 100, "at": "durationMs"}, _res(), "satisfied"),
+        ({"kind": "compare", "op": "gt", "value": 100, "at": "duration_ms"}, _res(), "violated"),
+        (
+            {"kind": "compare", "op": "lte", "value": 5, "at": "body.n"},
+            _res(body={"n": "5"}),
+            "satisfied",
+        ),
+        (
+            {"kind": "compare", "op": "gte", "value": 5, "at": "body.n"},
+            _res(body={"n": 4}),
+            "violated",
+        ),
+        (
+            {"kind": "compare", "op": "lt", "value": 5, "at": "body.n"},
+            _res(body={"n": "abc"}),
+            "violated",
+        ),
+        (
+            {"kind": "compare", "op": "lt", "value": 5, "at": "body.n"},
+            _res(body={"n": ""}),
+            "violated",
+        ),
+        (
+            {"kind": "compare", "op": "lt", "value": 5, "at": "body.n"},
+            _res(body={"n": True}),
+            "violated",
+        ),
+    ],
+)
+def test_at_and_new_assertion_kinds(assertion, result, verdict) -> None:
+    assert check_assertion(assertion, result).verdict == verdict
+
+
+def test_at_reads_response_headers_case_insensitively() -> None:
+    result = ExecutionResult(
+        operation="x", ok=True, duration_ms=1, headers={"location": "/items/7"}
+    )
+    assertion = {"kind": "matches", "at": "headers.Location", "pattern": r"/items/\d+$"}
+    assert check_assertion(assertion, result).verdict == "satisfied"

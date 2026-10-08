@@ -95,3 +95,30 @@ def test_text_match_regex_reports_invalid_pattern() -> None:
     result = ExecutionResult(operation="x", ok=True, duration_ms=0, stdout="abc")
     outcome = check_expectation({"kind": "text", "value": "(", "match": "regex"}, result)
     assert outcome.verdict == "violated"
+
+
+@pytest.mark.parametrize(
+    ("status", "verdict"),
+    [(201, "satisfied"), (200, "satisfied"), (204, "satisfied"), (404, "violated")],
+)
+def test_http_status_also_accepts(status, verdict) -> None:
+    result = ExecutionResult(operation="x", ok=True, duration_ms=0, status=status)
+    expectation = {"kind": "http_status", "status": 201, "alsoAccepts": [200, 204]}
+    assert check_expectation(expectation, result).verdict == verdict
+
+
+def test_http_status_failure_names_every_accepted_status() -> None:
+    result = ExecutionResult(operation="x", ok=True, duration_ms=0, status=404)
+    expectation = {"kind": "http_status", "status": 201, "alsoAccepts": [200, 204]}
+    assert "201 or 200 or 204" in check_expectation(expectation, result).why
+
+
+def test_result_judges_the_action_itself() -> None:
+    result = ExecutionResult(operation="x", ok=True, duration_ms=0, body={"error": "nope"})
+    expectation = {
+        "kind": "result",
+        "assert": {"kind": "equals", "at": "body.error", "value": "nope"},
+    }
+    assert check_expectation(expectation, result).verdict == "satisfied"
+    expectation = {"kind": "result", "assert": {"kind": "equals", "at": "body.error", "value": "x"}}
+    assert check_expectation(expectation, result).verdict == "violated"

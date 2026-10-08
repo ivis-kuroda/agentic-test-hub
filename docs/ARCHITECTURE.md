@@ -171,6 +171,22 @@ noise is filtered by pattern so the condition asks whether *this change*
 introduced anything — and suppressed entries are counted, so the allowance
 stays visible rather than quietly growing.
 
+## Judging an action's result
+
+An `Expectation` of kind `result` judges the action's own `ExecutionResult`
+(`operation_result` judges a separately run operation). Both carry an
+`Assertion`, whose `equals`/`contains`/`matches`/`keys`/`one_of`/`compare`
+kinds take an optional `at`: a dotted path into the result (`body.error`,
+`headers.location`, `status`, `durationMs`, `exitCode`, `stdout`). A scenario
+step's `produces` reads the same paths through the same helper
+(`getResultAtPath` / `get_result_at_path`), so the two never disagree. Python
+accepts the camelCase names from YAML and maps them to snake_case.
+
+- `keys`: the subject is an object whose key *set* equals `value`.
+- `one_of`: the subject equals one of `values`, string/number tolerant.
+- `compare`: `op` (`lt|lte|gt|gte`) against a number; the subject is coerced.
+- `http_status.alsoAccepts`: further statuses that also satisfy it.
+
 ## AI at authoring time, deterministic code at run time
 
 Running an agent for every test execution is slow, expensive and

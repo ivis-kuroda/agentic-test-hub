@@ -14,6 +14,7 @@ const expectationKindItems: { label: string; value: ExpectationKind }[] = [
   { label: "Error message", value: "error_message" },
   { label: "Stdout contains", value: "stdout_contains" },
   { label: "Operation result", value: "operation_result" },
+  { label: "Result of this action", value: "result" },
   { label: "AI judgement", value: "ai_judgement" },
   { label: "Unspecified (migration debt)", value: "unspecified" },
 ];
@@ -26,6 +27,9 @@ const assertKindItems = [
   { label: "equals", value: "equals" as const },
   { label: "contains", value: "contains" as const },
   { label: "matches", value: "matches" as const },
+  { label: "keys", value: "keys" as const },
+  { label: "one_of", value: "one_of" as const },
+  { label: "compare", value: "compare" as const },
   { label: "row_count", value: "row_count" as const },
   { label: "natural", value: "natural" as const },
 ];
@@ -64,6 +68,12 @@ function removeExpectation(index: number): void {
         placeholder="status, e.g. 201"
         class="w-full"
       />
+      <UInput
+        v-if="expectation.kind === 'http_status'"
+        v-model="expectation.alsoAccepts"
+        placeholder="also accepts, e.g. 200, 204 (optional)"
+        class="w-full"
+      />
 
       <template v-if="expectation.kind === 'text' || expectation.kind === 'error_message'">
         <UInput v-model="expectation.value" placeholder="expected text" class="w-full" />
@@ -89,15 +99,50 @@ function removeExpectation(index: number): void {
         />
       </template>
 
-      <template v-if="expectation.kind === 'operation_result'">
-        <UInput v-model="expectation.operation" placeholder="OP-EXAMPLE" class="w-full" />
-        <UTextarea
-          v-model="expectation.params"
-          :rows="2"
-          placeholder="params, as JSON"
+      <template v-if="expectation.kind === 'operation_result' || expectation.kind === 'result'">
+        <template v-if="expectation.kind === 'operation_result'">
+          <UInput v-model="expectation.operation" placeholder="OP-EXAMPLE" class="w-full" />
+          <UTextarea
+            v-model="expectation.params"
+            :rows="2"
+            placeholder="params, as JSON"
+            class="w-full font-mono text-sm"
+          />
+        </template>
+        <USelect v-model="expectation.assertKind" :items="assertKindItems" class="w-40" />
+        <UInput
+          v-if="
+            ['equals', 'contains', 'matches', 'keys', 'one_of', 'compare'].includes(
+              expectation.assertKind,
+            )
+          "
+          v-model="expectation.assertAt"
+          placeholder="at, e.g. body.error or headers.location (optional)"
+          class="w-full"
+        />
+        <UInput
+          v-if="expectation.assertKind === 'keys' || expectation.assertKind === 'one_of'"
+          v-model="expectation.assertList"
+          placeholder="JSON array"
           class="w-full font-mono text-sm"
         />
-        <USelect v-model="expectation.assertKind" :items="assertKindItems" class="w-40" />
+        <USelect
+          v-if="expectation.assertKind === 'compare'"
+          v-model="expectation.assertOp"
+          :items="[
+            { label: 'lt', value: 'lt' },
+            { label: 'lte', value: 'lte' },
+            { label: 'gt', value: 'gt' },
+            { label: 'gte', value: 'gte' },
+          ]"
+          class="w-40"
+        />
+        <UInput
+          v-if="expectation.assertKind === 'compare'"
+          v-model="expectation.assertValueText"
+          placeholder="number"
+          class="w-full"
+        />
         <UInput
           v-if="expectation.assertKind === 'equals'"
           v-model="expectation.assertValueText"

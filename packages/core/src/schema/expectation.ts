@@ -4,6 +4,14 @@ import { traceableFields } from "./common.ts";
 import { OperationId } from "./id.ts";
 
 /**
+ * Optional dotted path into an `ExecutionResult` selecting what an assertion
+ * judges (`body.error`, `headers.location`, `status`, `durationMs`,
+ * `exitCode`, `stdout`). Omitted, the assertion judges whatever the result
+ * most specifically carries (rows, then body, then standard output).
+ */
+const AssertionPath = z.string().min(1).optional();
+
+/**
  * How the result of an operation is judged.
  *
  * `natural` is the deliberate escape hatch: a claim stated in prose, settled
@@ -11,9 +19,27 @@ import { OperationId } from "./id.ts";
  * judgement, which a string comparison dressed up as a rule would not be.
  */
 export const Assertion = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("equals"), value: z.unknown() }),
-  z.object({ kind: z.literal("contains"), value: z.string().min(1) }),
-  z.object({ kind: z.literal("matches"), pattern: z.string().min(1) }),
+  z.object({ kind: z.literal("equals"), value: z.unknown(), at: AssertionPath }),
+  z.object({ kind: z.literal("contains"), value: z.string().min(1), at: AssertionPath }),
+  z.object({ kind: z.literal("matches"), pattern: z.string().min(1), at: AssertionPath }),
+  /**
+   * The subject is an object whose key set equals `value` exactly, in any
+   * order. Catches a response that grew or lost a field.
+   */
+  z.object({ kind: z.literal("keys"), value: z.array(z.string()), at: AssertionPath }),
+  /** The subject equals one of `values`, compared as `equals` compares. */
+  z.object({
+    kind: z.literal("one_of"),
+    values: z.array(z.unknown()).min(1),
+    at: AssertionPath,
+  }),
+  /** The subject, read as a number, stands in this relation to `value`. */
+  z.object({
+    kind: z.literal("compare"),
+    op: z.enum(["lt", "lte", "gt", "gte"]),
+    value: z.number(),
+    at: AssertionPath,
+  }),
   z.object({ kind: z.literal("row_count"), count: z.number().int().min(0) }),
   z.object({ kind: z.literal("natural"), text: z.string().min(1) }),
 ]);
@@ -56,6 +82,8 @@ export const Expectation = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("http_status"),
     status: z.number().int().min(100).max(599),
+    /** Further statuses that also satisfy the expectation. */
+    alsoAccepts: z.array(z.number().int().min(100).max(599)).optional(),
     ...annotations,
   }),
 
@@ -107,6 +135,19 @@ export const Expectation = z.discriminatedUnion("kind", [
   }),
 
   /**
+   * The action's own result was judged by an assertion.
+   *
+   * `operation_result` judges a separately run operation; this judges what
+   * the case or step's own action returned, so a response body or header can
+   * be checked without declaring a second operation.
+   */
+  z.object({
+    kind: z.literal("result"),
+    assert: Assertion,
+    ...annotations,
+  }),
+
+  /**
    * A claim settled by a model rather than by comparison.
    *
    * `visual` covers rendering ("the layout is not broken"); `semantic` covers
@@ -148,17 +189,18 @@ export const MECHANICAL_KINDS = [
   "error_message",
   "stdout_contains",
   "operation_result",
+  "result",
 ] as const;
 
 /**
  * Reports whether an expectation can be checked without a model, treating an
- * `operation_result` judged in prose as requiring judgement.
+ * `operation_result` or `result` judged in prose as requiring judgement.
  *
  * @param expectation - The expectation to classify.
  * @returns `true` when a deterministic runner can settle it alone.
  */
 export function isMechanical(expectation: Expectation): boolean {
-  if (expectation.kind === "operation_result") {
+  if (expectation.kind === "operation_result" || expectation.kind === "result") {
     return expectation.assert.kind !== "natural";
   }
   return (MECHANICAL_KINDS as readonly string[]).includes(expectation.kind);

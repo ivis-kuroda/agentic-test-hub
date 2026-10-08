@@ -36,7 +36,12 @@ export function saveSpecEntity(
   entity: unknown,
   expectedHash?: string,
 ): Promise<{ file: string; hash: string; created: boolean }> {
-  return $fetch(`/api/specs/${kind}`, {
+  // The path is widened to `string` on purpose: left as a template literal,
+  // the compiler resolves it against every typed Nitro route, including the
+  // suite route whose body is the whole serialised schema, and gives up with
+  // "excessive stack depth" once that schema is large enough.
+  const path: string = `/api/specs/${kind}`;
+  return $fetch<{ file: string; hash: string; created: boolean }>(path, {
     method: "PUT",
     body: { entity, ...(expectedHash === undefined ? {} : { expectedHash }) },
   });
@@ -54,7 +59,8 @@ export function removeSpecEntity(
   id: string,
   expectedHash: string,
 ): Promise<{ file: string }> {
-  return $fetch(`/api/specs/${kind}/${id}`, {
+  const path: string = `/api/specs/${kind}/${id}`;
+  return $fetch<{ file: string }>(path, {
     method: "DELETE",
     query: { expectedHash },
   });

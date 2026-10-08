@@ -6,10 +6,12 @@ Judging an `Assertion` against what an operation produced, mirroring
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from .paths import get_result_at_path
 from .types import ExecutionResult
 
 AssertionVerdict = Literal["satisfied", "violated", "needs_judgement"]
@@ -50,6 +52,42 @@ def text_of(result: ExecutionResult) -> str:
     return "\n".join(part for part in parts if part)
 
 
+def _subject_for(at: str | None, result: ExecutionResult) -> tuple[bool | None, Any, str]:
+    """The value an assertion judges: what `at` selects, else `subject_of`.
+
+    Returns `(True, value, source)`, or `(None, None, why)` when `at` names
+    nothing in the result.
+    """
+    if at is None:
+        value, source = subject_of(result)
+        return True, value, source
+    present, value = get_result_at_path(result, at)
+    if not present:
+        return None, None, f'nothing at "{at}" in the result'
+    return True, value, f'"{at}"'
+
+
+def _text_of_subject(value: Any) -> str:
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+def _loosely_equal(a: Any, b: Any) -> bool:
+    return a == b or str(a) == str(b)
+
+
+def _to_number(value: Any) -> float | None:
+    """Reads a value as a finite number, refusing blanks and booleans."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def check_assertion(assertion: dict[str, Any], result: ExecutionResult) -> AssertionOutcome:
     """Judges an assertion against what an operation produced."""
     if not result.ok:
@@ -75,28 +113,96 @@ def check_assertion(assertion: dict[str, Any], result: ExecutionResult) -> Asser
         )
 
     if kind == "equals":
-        value, source = subject_of(result)
+        subject = _subject_for(assertion.get("at"), result)
+        if subject[0] is None:
+            return AssertionOutcome("violated", subject[2])
+        value, source = subject[1], subject[2]
         expected = assertion["value"]
-        matches = value == expected or str(value) == str(expected)
         return (
             AssertionOutcome("satisfied", f"{source} equals the expected value")
-            if matches
+            if _loosely_equal(value, expected)
             else AssertionOutcome(
                 "violated", f"{source} is {json.dumps(value)}, expected {json.dumps(expected)}"
             )
         )
 
-    if kind == "contains":
-        text = text_of(result)
-        value = assertion["value"]
+    if kind == "one_of":
+        subject = _subject_for(assertion.get("at"), result)
+        if subject[0] is None:
+            return AssertionOutcome("violated", subject[2])
+        value, source = subject[1], subject[2]
+        values = assertion["values"]
         return (
-            AssertionOutcome("satisfied", f'output contains "{value}"')
-            if value in text
-            else AssertionOutcome("violated", f'output does not contain "{value}"')
+            AssertionOutcome("satisfied", f"{source} is one of the accepted values")
+            if any(_loosely_equal(value, candidate) for candidate in values)
+            else AssertionOutcome(
+                "violated",
+                f"{source} is {json.dumps(value)}, expected one of {json.dumps(values)}",
+            )
         )
 
-    if kind == "matches":
-        text = text_of(result)
+    if kind == "keys":
+        subject = _subject_for(assertion.get("at"), result)
+        if subject[0] is None:
+            return AssertionOutcome("violated", subject[2])
+        value, source = subject[1], subject[2]
+        if not isinstance(value, dict):
+            return AssertionOutcome(
+                "violated", f"{source} is not an object, so it has no keys to compare"
+            )
+        expected_keys = set(assertion["value"])
+        actual_keys = set(value)
+        missing = sorted(expected_keys - actual_keys)
+        extra = sorted(actual_keys - expected_keys)
+        return (
+            AssertionOutcome("satisfied", f"{source} has exactly the expected keys")
+            if not missing and not extra
+            else AssertionOutcome(
+                "violated",
+                f"{source} keys differ: missing {json.dumps(missing)}, "
+                f"unexpected {json.dumps(extra)}",
+            )
+        )
+
+    if kind == "compare":
+        subject = _subject_for(assertion.get("at"), result)
+        if subject[0] is None:
+            return AssertionOutcome("violated", subject[2])
+        value, source = subject[1], subject[2]
+        number = _to_number(value)
+        if number is None:
+            return AssertionOutcome(
+                "violated", f"{source} is {json.dumps(value)}, which is not a number"
+            )
+        op, bound = assertion["op"], assertion["value"]
+        holds = {
+            "lt": number < bound,
+            "lte": number <= bound,
+            "gt": number > bound,
+            "gte": number >= bound,
+        }[op]
+        return (
+            AssertionOutcome("satisfied", f"{source} ({number:g}) is {op} {bound:g}")
+            if holds
+            else AssertionOutcome("violated", f"{source} is {number:g}, expected {op} {bound:g}")
+        )
+
+    if kind in ("contains", "matches"):
+        at = assertion.get("at")
+        if at is None:
+            text = text_of(result)
+        else:
+            subject = _subject_for(at, result)
+            if subject[0] is None:
+                return AssertionOutcome("violated", subject[2])
+            text = _text_of_subject(subject[1])
+        if kind == "contains":
+            value = assertion["value"]
+            return (
+                AssertionOutcome("satisfied", f'output contains "{value}"')
+                if value in text
+                else AssertionOutcome("violated", f'output does not contain "{value}"')
+            )
         pattern = assertion["pattern"]
         try:
             compiled = re.compile(pattern)

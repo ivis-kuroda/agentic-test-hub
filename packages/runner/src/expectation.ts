@@ -39,13 +39,14 @@ function textForStream(result: ExecutionResult, stream: "stdout" | "stderr" | un
 /**
  * Judges an expectation against what an operation produced.
  *
- * Covers all seven {@link Expectation} kinds, unlike {@link checkAssertion}
+ * Covers all eight {@link Expectation} kinds, unlike {@link checkAssertion}
  * which only judges the `Assertion` union nested inside an
  * `operation_result` expectation. For `operation_result` itself, this
  * delegates to `checkAssertion` directly — the caller (`runCase`/`runStep`)
  * is responsible for having already run `expectation.operation` with
  * `expectation.params` and passing *that* result here, since it is a
- * different operation from whatever the case's own action was.
+ * different operation from whatever the case's own action was. A `result`
+ * expectation judges the action's own result, so it needs no such step.
  *
  * @param expectation - The claim to judge.
  * @param result - What the relevant operation produced.
@@ -67,12 +68,17 @@ export function checkExpectation(
       if (result.status === undefined) {
         return { verdict: "violated", why: "no HTTP status was observed" };
       }
-      return result.status === expectation.status
-        ? { verdict: "satisfied", why: `status is ${expectation.status}, as expected` }
-        : {
-            verdict: "violated",
-            why: `status is ${result.status}, expected ${expectation.status}`,
-          };
+      if (result.status === expectation.status) {
+        return { verdict: "satisfied", why: `status is ${expectation.status}, as expected` };
+      }
+      if (expectation.alsoAccepts?.includes(result.status)) {
+        return { verdict: "satisfied", why: `status is ${result.status}, an accepted alternative` };
+      }
+      const accepted = [expectation.status, ...(expectation.alsoAccepts ?? [])];
+      return {
+        verdict: "violated",
+        why: `status is ${result.status}, expected ${accepted.join(" or ")}`,
+      };
     }
 
     case "text": {
@@ -100,6 +106,7 @@ export function checkExpectation(
     }
 
     case "operation_result":
+    case "result":
       return checkAssertion(expectation.assert, result);
 
     case "ai_judgement":

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .expectation import check_expectation
+from .paths import get_result_at_path
 from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
 from .run_case import (
@@ -38,19 +39,6 @@ _DEFAULT_EVIDENCE_PLAN = {
     ],
     "timing": "after",
 }
-
-
-def _get_at_path(action: ExecutionResult, path: str) -> tuple[bool, Any]:
-    """Reads a dotted path out of an `ExecutionResult` (e.g. `body.id`)."""
-    first, *rest = path.split(".")
-    if not hasattr(action, first):
-        return False, None
-    current: Any = getattr(action, first)
-    for segment in rest:
-        if not isinstance(current, dict) or segment not in current:
-            return False, None
-        current = current[segment]
-    return True, current
 
 
 @dataclass(frozen=True)
@@ -89,7 +77,7 @@ def run_step(
 
     produced: dict[str, Any] = {}
     for name, path in step.get("produces", {}).items():
-        present, value = _get_at_path(action, path)
+        present, value = get_result_at_path(action, path)
         if present:
             produced[name] = value
 

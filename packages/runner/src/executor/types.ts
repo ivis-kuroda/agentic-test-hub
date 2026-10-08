@@ -39,6 +39,8 @@ export interface ExecutionResult {
   readonly stderr?: string;
   /** Parsed response body, for requests. */
   readonly body?: unknown;
+  /** Response headers with lower-cased names, for requests. */
+  readonly headers?: Readonly<Record<string, string>>;
   /** Result rows, for queries. */
   readonly rows?: readonly Record<string, unknown>[];
   /** Why the operation could not complete. Set only when `ok` is false. */

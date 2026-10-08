@@ -25,6 +25,7 @@ describe("checkExpectation", () => {
       assert: { kind: "contains", value: "x" },
       viewpoints: [],
     },
+    { kind: "result", assert: { kind: "equals", value: "x" }, viewpoints: [] },
     { kind: "ai_judgement", aspect: "visual", value: "x", viewpoints: [] },
     { kind: "unspecified", text: "x", viewpoints: [] },
   ];
@@ -216,6 +217,45 @@ describe("checkExpectation", () => {
       );
       expect(outcome.verdict).toBe("needs_judgement");
       expect(outcome.why).toBe("an error is returned");
+    });
+  });
+
+  describe("http_status alsoAccepts", () => {
+    const expectation: Expectation = {
+      kind: "http_status",
+      status: 201,
+      alsoAccepts: [200, 204],
+      viewpoints: [],
+    };
+    it.each([
+      [201, "satisfied"],
+      [200, "satisfied"],
+      [204, "satisfied"],
+      [404, "violated"],
+    ])("status %i is %s", (status, verdict) => {
+      expect(checkExpectation(expectation, result({ status })).verdict).toBe(verdict);
+    });
+
+    it("names every accepted status when it fails", () => {
+      expect(checkExpectation(expectation, result({ status: 404 })).why).toContain(
+        "201 or 200 or 204",
+      );
+    });
+  });
+
+  describe("result", () => {
+    it("judges the action's own result", () => {
+      const expectation: Expectation = {
+        kind: "result",
+        assert: { kind: "equals", at: "body.error", value: "nope" },
+        viewpoints: [],
+      };
+      expect(checkExpectation(expectation, result({ body: { error: "nope" } })).verdict).toBe(
+        "satisfied",
+      );
+      expect(checkExpectation(expectation, result({ body: { error: "x" } })).verdict).toBe(
+        "violated",
+      );
     });
   });
 });

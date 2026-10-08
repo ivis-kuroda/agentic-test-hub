@@ -1,4 +1,4 @@
-import { deepEqual, type Assertion } from "@agentic-test-hub/core";
+import { deepEqual, getAtPath, type Assertion, type Resolved } from "@agentic-test-hub/core";
 
 import type { ExecutionResult } from "./executor/types.ts";
 
@@ -55,6 +55,53 @@ export function subjectOf(result: ExecutionResult): { value: unknown; from: stri
 }
 
 /**
+ * Reads a dotted path out of an {@link ExecutionResult}.
+ *
+ * The one reader behind both an assertion's `at` and a scenario step's
+ * `produces`, so the two always agree on what a path means. Response header
+ * names are stored lower-cased, so the segment after `headers` is lower-cased
+ * before the lookup.
+ *
+ * @param result - What an operation produced.
+ * @param path - Dotted path such as `body.error` or `headers.location`.
+ * @returns The value, or an absent marker when any segment is missing.
+ */
+export function getResultAtPath(result: ExecutionResult, path: string): Resolved {
+  const segments = path.split(".");
+  if (segments[0] === "headers" && segments[1] !== undefined) {
+    segments[1] = segments[1].toLowerCase();
+  }
+  return getAtPath(result, segments.join("."));
+}
+
+type Subject = { ok: true; value: unknown; from: string } | { ok: false; why: string };
+
+/** The value an assertion judges: what `at` selects, else {@link subjectOf}. */
+function subjectFor(at: string | undefined, result: ExecutionResult): Subject {
+  if (at === undefined) return { ok: true, ...subjectOf(result) };
+  const read = getResultAtPath(result, at);
+  if (!read.present) return { ok: false, why: `nothing at "${at}" in the result` };
+  return { ok: true, value: read.value, from: `"${at}"` };
+}
+
+/** Text form of a subject chosen by `at`: strings as they are, anything else as JSON. */
+function textOfSubject(value: unknown): string {
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
+}
+
+function looselyEqual(a: unknown, b: unknown): boolean {
+  return deepEqual(a, b) || String(a) === String(b);
+}
+
+/** Reads a value as a finite number, refusing blanks and booleans that `Number` would coerce. */
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === "boolean") return undefined;
+  if (typeof value === "string" && value.trim() === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
  * Text an assertion can search, whatever the operation produced.
  *
  * Exported for {@link checkExpectation} (see `expectation.ts`), which needs
@@ -106,13 +153,13 @@ export function checkAssertion(assertion: Assertion, result: ExecutionResult): A
     }
 
     case "equals": {
-      const { value, from } = subjectOf(result);
+      const subject = subjectFor(assertion.at, result);
+      if (!subject.ok) return { verdict: "violated", why: subject.why };
+      const { value, from } = subject;
       // Specifications write counts as numbers; databases and JSON return
       // them as strings often enough that comparing only structurally would
       // fail for reasons that have nothing to do with the system under test.
-      const matches =
-        deepEqual(value, assertion.value) || String(value) === String(assertion.value);
-      return matches
+      return looselyEqual(value, assertion.value)
         ? { verdict: "satisfied", why: `${from} equals the expected value` }
         : {
             verdict: "violated",
@@ -120,15 +167,87 @@ export function checkAssertion(assertion: Assertion, result: ExecutionResult): A
           };
     }
 
+    case "one_of": {
+      const subject = subjectFor(assertion.at, result);
+      if (!subject.ok) return { verdict: "violated", why: subject.why };
+      return assertion.values.some((candidate) => looselyEqual(subject.value, candidate))
+        ? { verdict: "satisfied", why: `${subject.from} is one of the accepted values` }
+        : {
+            verdict: "violated",
+            why: `${subject.from} is ${JSON.stringify(subject.value)}, expected one of ${JSON.stringify(assertion.values)}`,
+          };
+    }
+
+    case "keys": {
+      const subject = subjectFor(assertion.at, result);
+      if (!subject.ok) return { verdict: "violated", why: subject.why };
+      const { value, from } = subject;
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return {
+          verdict: "violated",
+          why: `${from} is not an object, so it has no keys to compare`,
+        };
+      }
+      const actual = new Set(Object.keys(value));
+      const expected = new Set(assertion.value);
+      const missing = [...expected].filter((key) => !actual.has(key));
+      const extra = [...actual].filter((key) => !expected.has(key));
+      return missing.length === 0 && extra.length === 0
+        ? { verdict: "satisfied", why: `${from} has exactly the expected keys` }
+        : {
+            verdict: "violated",
+            why: `${from} keys differ: missing ${JSON.stringify(missing)}, unexpected ${JSON.stringify(extra)}`,
+          };
+    }
+
+    case "compare": {
+      const subject = subjectFor(assertion.at, result);
+      if (!subject.ok) return { verdict: "violated", why: subject.why };
+      const n = toNumber(subject.value);
+      if (n === undefined) {
+        return {
+          verdict: "violated",
+          why: `${subject.from} is ${JSON.stringify(subject.value)}, which is not a number`,
+        };
+      }
+      const holds = {
+        lt: n < assertion.value,
+        lte: n <= assertion.value,
+        gt: n > assertion.value,
+        gte: n >= assertion.value,
+      }[assertion.op];
+      return holds
+        ? {
+            verdict: "satisfied",
+            why: `${subject.from} (${n}) is ${assertion.op} ${assertion.value}`,
+          }
+        : {
+            verdict: "violated",
+            why: `${subject.from} is ${n}, expected ${assertion.op} ${assertion.value}`,
+          };
+    }
+
     case "contains": {
-      const text = textOf(result);
+      let text: string;
+      if (assertion.at === undefined) text = textOf(result);
+      else {
+        const subject = subjectFor(assertion.at, result);
+        if (!subject.ok) return { verdict: "violated", why: subject.why };
+        text = textOfSubject(subject.value);
+      }
       return text.includes(assertion.value)
         ? { verdict: "satisfied", why: `output contains "${assertion.value}"` }
         : { verdict: "violated", why: `output does not contain "${assertion.value}"` };
     }
 
     case "matches": {
-      const text = textOf(result);
+      let text: string;
+      if (assertion.at === undefined) text = textOf(result);
+      else {
+        const subject = subjectFor(assertion.at, result);
+        if (!subject.ok) return { verdict: "violated", why: subject.why };
+        text = textOfSubject(subject.value);
+      }
       let pattern: RegExp;
       try {
         pattern = new RegExp(assertion.pattern);

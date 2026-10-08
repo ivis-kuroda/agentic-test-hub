@@ -2,13 +2,13 @@ import {
   DEFAULT_EVIDENCE_PLAN,
   DEFAULT_VERDICT_POLICY,
   evaluateVerdict,
-  getAtPath,
   type Scenario,
   type Step,
   type Verdict,
   type VerdictResult,
 } from "@agentic-test-hub/core";
 
+import { getResultAtPath } from "./assert.ts";
 import { checkExpectation } from "./expectation.ts";
 import {
   collectEvidence,
@@ -74,7 +74,7 @@ export async function runStep(
 
   const produced: Record<string, unknown> = {};
   for (const [name, path] of Object.entries(step.produces)) {
-    const value = getAtPath(action, path);
+    const value = getResultAtPath(action, path);
     if (value.present) produced[name] = value.value;
   }
 

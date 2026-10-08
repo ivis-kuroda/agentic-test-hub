@@ -38,7 +38,9 @@ function describeAction(action: ActionRef | undefined): string {
 function describeExpectation(expectation: Expectation): string {
   switch (expectation.kind) {
     case "http_status":
-      return `HTTP status is ${expectation.status}`;
+      return expectation.alsoAccepts === undefined || expectation.alsoAccepts.length === 0
+        ? `HTTP status is ${expectation.status}`
+        : `HTTP status is ${[expectation.status, ...expectation.alsoAccepts].join(" or ")}`;
     case "text":
       return `${expectation.match} "${expectation.value}"`;
     case "error_message":
@@ -47,6 +49,8 @@ function describeExpectation(expectation: Expectation): string {
       return `output contains "${expectation.value}"`;
     case "operation_result":
       return `${expectation.operation} ${expectation.assert.kind}`;
+    case "result":
+      return `result ${expectation.assert.kind}`;
     case "ai_judgement":
       return `(${expectation.aspect}) ${expectation.value}`;
     case "unspecified":

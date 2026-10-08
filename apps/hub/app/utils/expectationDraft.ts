@@ -1,4 +1,4 @@
-import type { Expectation } from "@agentic-test-hub/core";
+import type { Assertion, Expectation } from "@agentic-test-hub/core";
 
 /**
  * The expectation form's fields, as a plain editable shape.
@@ -15,6 +15,7 @@ export type ExpectationKind =
   | "error_message"
   | "stdout_contains"
   | "operation_result"
+  | "result"
   | "ai_judgement"
   | "unspecified";
 
@@ -23,13 +24,28 @@ export interface ExpectationDraft {
   viewpoints: string[];
   knownDeviation: string;
   status: string;
+  /** Comma-separated extra statuses that also satisfy an `http_status`. */
+  alsoAccepts: string;
   value: string;
   match: "exact" | "contains" | "regex";
   scope: string;
   stream: "both" | "stdout" | "stderr";
   operation: string;
   params: string;
-  assertKind: "equals" | "contains" | "matches" | "row_count" | "natural";
+  assertKind:
+    | "equals"
+    | "contains"
+    | "matches"
+    | "keys"
+    | "one_of"
+    | "compare"
+    | "row_count"
+    | "natural";
+  /** Dotted path into the result an assertion judges; blank judges the default subject. */
+  assertAt: string;
+  assertOp: "lt" | "lte" | "gt" | "gte";
+  /** JSON array text, for the `keys` and `one_of` assertions. */
+  assertList: string;
   assertValueText: string;
   assertContains: string;
   assertPattern: string;
@@ -46,6 +62,7 @@ export function newExpectationDraft(): ExpectationDraft {
     viewpoints: [],
     knownDeviation: "",
     status: "200",
+    alsoAccepts: "",
     value: "",
     match: "contains",
     scope: "",
@@ -53,6 +70,9 @@ export function newExpectationDraft(): ExpectationDraft {
     operation: "",
     params: "{}",
     assertKind: "contains",
+    assertAt: "",
+    assertOp: "lte",
+    assertList: "[]",
     assertValueText: "",
     assertContains: "",
     assertPattern: "",
@@ -61,6 +81,38 @@ export function newExpectationDraft(): ExpectationDraft {
     aspect: "visual",
     unspecifiedText: "",
   };
+}
+
+function applyAssertionToDraft(draft: ExpectationDraft, assertion: Assertion): void {
+  draft.assertKind = assertion.kind;
+  if ("at" in assertion) draft.assertAt = assertion.at ?? "";
+  switch (assertion.kind) {
+    case "equals":
+      draft.assertValueText = stringifyLevelValue(assertion.value);
+      break;
+    case "contains":
+      draft.assertContains = assertion.value;
+      break;
+    case "matches":
+      draft.assertPattern = assertion.pattern;
+      break;
+    case "keys":
+      draft.assertList = JSON.stringify(assertion.value);
+      break;
+    case "one_of":
+      draft.assertList = JSON.stringify(assertion.values);
+      break;
+    case "compare":
+      draft.assertOp = assertion.op;
+      draft.assertValueText = String(assertion.value);
+      break;
+    case "row_count":
+      draft.assertCount = String(assertion.count);
+      break;
+    case "natural":
+      draft.assertNatural = assertion.text;
+      break;
+  }
 }
 
 /** Converts a loaded expectation into its editable draft form. */
@@ -73,6 +125,7 @@ export function expectationDraftFromEntity(expectation: Expectation): Expectatio
   switch (expectation.kind) {
     case "http_status":
       draft.status = String(expectation.status);
+      draft.alsoAccepts = (expectation.alsoAccepts ?? []).join(", ");
       break;
     case "text":
       draft.value = expectation.value;
@@ -90,24 +143,10 @@ export function expectationDraftFromEntity(expectation: Expectation): Expectatio
     case "operation_result":
       draft.operation = expectation.operation;
       draft.params = JSON.stringify(expectation.params, null, 2);
-      draft.assertKind = expectation.assert.kind;
-      switch (expectation.assert.kind) {
-        case "equals":
-          draft.assertValueText = stringifyLevelValue(expectation.assert.value);
-          break;
-        case "contains":
-          draft.assertContains = expectation.assert.value;
-          break;
-        case "matches":
-          draft.assertPattern = expectation.assert.pattern;
-          break;
-        case "row_count":
-          draft.assertCount = String(expectation.assert.count);
-          break;
-        case "natural":
-          draft.assertNatural = expectation.assert.text;
-          break;
-      }
+      applyAssertionToDraft(draft, expectation.assert);
+      break;
+    case "result":
+      applyAssertionToDraft(draft, expectation.assert);
       break;
     case "ai_judgement":
       draft.aspect = expectation.aspect;
@@ -121,13 +160,25 @@ export function expectationDraftFromEntity(expectation: Expectation): Expectatio
 }
 
 function assertionToEntity(expectation: ExpectationDraft): unknown {
+  const at = expectation.assertAt === "" ? {} : { at: expectation.assertAt };
   switch (expectation.assertKind) {
     case "equals":
-      return { kind: "equals", value: parseLevelValue(expectation.assertValueText) };
+      return { kind: "equals", value: parseLevelValue(expectation.assertValueText), ...at };
     case "contains":
-      return { kind: "contains", value: expectation.assertContains };
+      return { kind: "contains", value: expectation.assertContains, ...at };
     case "matches":
-      return { kind: "matches", pattern: expectation.assertPattern };
+      return { kind: "matches", pattern: expectation.assertPattern, ...at };
+    case "keys":
+      return { kind: "keys", value: JSON.parse(expectation.assertList), ...at };
+    case "one_of":
+      return { kind: "one_of", values: JSON.parse(expectation.assertList), ...at };
+    case "compare":
+      return {
+        kind: "compare",
+        op: expectation.assertOp,
+        value: Number(expectation.assertValueText),
+        ...at,
+      };
     case "row_count":
       return { kind: "row_count", count: Number(expectation.assertCount) };
     case "natural":
@@ -143,7 +194,14 @@ export function expectationToEntity(expectation: ExpectationDraft): unknown {
   };
   switch (expectation.kind) {
     case "http_status":
-      return { kind: "http_status", status: Number(expectation.status), ...shared };
+      return {
+        kind: "http_status",
+        status: Number(expectation.status),
+        ...(expectation.alsoAccepts.trim() === ""
+          ? {}
+          : { alsoAccepts: expectation.alsoAccepts.split(",").map((part) => Number(part.trim())) }),
+        ...shared,
+      };
     case "text":
       return {
         kind: "text",
@@ -174,6 +232,8 @@ export function expectationToEntity(expectation: ExpectationDraft): unknown {
         assert: assertionToEntity(expectation),
         ...shared,
       };
+    case "result":
+      return { kind: "result", assert: assertionToEntity(expectation), ...shared };
     case "ai_judgement":
       return {
         kind: "ai_judgement",

@@ -1,5 +1,5 @@
 """
-Judging any of the seven `Expectation` kinds against what an operation
+Judging any of the eight `Expectation` kinds against what an operation
 produced, mirroring `packages/runner/src/expectation.ts`.
 """
 
@@ -45,12 +45,13 @@ def check_expectation(expectation: dict[str, Any], result: ExecutionResult) -> A
     """
     Judges an expectation against what an operation produced.
 
-    Covers all seven expectation kinds, unlike `check_assertion`, which only
+    Covers all eight expectation kinds, unlike `check_assertion`, which only
     judges the `Assertion` union nested inside an `operation_result`
     expectation. For `operation_result` itself, this delegates to
     `check_assertion` directly — the caller (`run_case`/`run_step`) is
     responsible for having already run `expectation["operation"]` with
-    `expectation["params"]` and passing *that* result here.
+    `expectation["params"]` and passing *that* result here. A `result`
+    expectation judges the action's own result, so it needs no such step.
     """
     if not result.ok:
         return AssertionOutcome(
@@ -63,11 +64,15 @@ def check_expectation(expectation: dict[str, Any], result: ExecutionResult) -> A
         if result.status is None:
             return AssertionOutcome("violated", "no HTTP status was observed")
         expected = expectation["status"]
-        return (
-            AssertionOutcome("satisfied", f"status is {expected}, as expected")
-            if result.status == expected
-            else AssertionOutcome("violated", f"status is {result.status}, expected {expected}")
-        )
+        if result.status == expected:
+            return AssertionOutcome("satisfied", f"status is {expected}, as expected")
+        also = expectation.get("alsoAccepts") or []
+        if result.status in also:
+            return AssertionOutcome(
+                "satisfied", f"status is {result.status}, an accepted alternative"
+            )
+        accepted = " or ".join(str(status) for status in [expected, *also])
+        return AssertionOutcome("violated", f"status is {result.status}, expected {accepted}")
 
     if kind == "text":
         # Nothing narrows an ExecutionResult to one region of a page yet, so
@@ -95,7 +100,7 @@ def check_expectation(expectation: dict[str, Any], result: ExecutionResult) -> A
             else AssertionOutcome("violated", f'output does not contain "{value}"')
         )
 
-    if kind == "operation_result":
+    if kind in ("operation_result", "result"):
         return check_assertion(expectation["assert"], result)
 
     if kind == "ai_judgement":

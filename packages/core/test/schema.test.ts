@@ -62,6 +62,38 @@ describe("expectations", () => {
     expect(isMechanical(counted)).toBe(true);
   });
 
+  it("treats a result assertion as mechanical unless it is prose", () => {
+    const keys = Expectation.parse({ kind: "result", assert: { kind: "keys", value: ["a"] } });
+    expect(isMechanical(keys)).toBe(true);
+    const prose = Expectation.parse({
+      kind: "result",
+      assert: { kind: "natural", text: "reads well" },
+    });
+    expect(isMechanical(prose)).toBe(false);
+  });
+
+  it("accepts the extended assertion fields and rejects malformed ones", () => {
+    const ok = Expectation.parse({
+      kind: "operation_result",
+      operation: "OP-X",
+      assert: { kind: "compare", op: "lt", value: 3, at: "durationMs" },
+    });
+    expect(ok.kind).toBe("operation_result");
+    expect(
+      Expectation.safeParse({ kind: "result", assert: { kind: "compare", op: "eq", value: 3 } })
+        .success,
+    ).toBe(false);
+    expect(
+      Expectation.safeParse({ kind: "result", assert: { kind: "one_of", values: [] } }).success,
+    ).toBe(false);
+    expect(
+      Expectation.safeParse({ kind: "http_status", status: 201, alsoAccepts: [200, 99] }).success,
+    ).toBe(false);
+    expect(
+      Expectation.parse({ kind: "http_status", status: 201, alsoAccepts: [200] }),
+    ).toHaveProperty("alsoAccepts", [200]);
+  });
+
   it("carries an unverifiable imported claim verbatim, and marks it as such", () => {
     const imported = Expectation.parse({ kind: "unspecified", text: "an error is returned" });
     expect(isMechanical(imported)).toBe(false);
