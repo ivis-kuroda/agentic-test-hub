@@ -184,6 +184,15 @@ def collect_before(
     return results
 
 
+def with_plan_ignore(plan: dict[str, Any], observe: ObserveOptions | None) -> ObserveOptions:
+    """
+    `observe` with the plan's own `ignore` patterns added. The plan's patterns
+    come first, then any the caller supplied; both apply.
+    """
+    patterns = [*plan.get("ignore", []), *(observe.ignore if observe is not None else [])]
+    return ObserveOptions(ignore=patterns)
+
+
 def collect_evidence(
     plan: dict[str, Any],
     registry: ExecutorRegistry,
@@ -199,15 +208,19 @@ def collect_evidence(
     live session (never opened or closed here); `screenshot` is never
     gathered here, same limitation as the TypeScript original.
 
+    A plan's `ignore` patterns apply to every channel read here, merged with
+    any `options.observe.ignore` the caller supplied.
+
     @param before: Outputs from `collect_before`. When present, a unified
         diff of before and after is saved next to them, and with
         `timing: before_and_after` the `app_log` verdict reads only the lines
         added since `before`.
     """
     before = before or {}
+    observe = with_plan_ignore(plan, options.observe)
     observations: list[Observation] = []
     if options.browser_session is not None:
-        observations.extend(observe_browser(options.browser_session, options.observe))
+        observations.extend(observe_browser(options.browser_session, observe))
     for source in COLLECTED_BY_OPERATION:
         if source not in plan.get("sources", []):
             continue
@@ -226,7 +239,7 @@ def collect_evidence(
         ):
             delta = added_lines(collector_text(before_result), collector_text(result))
             judged = replace(result, stdout=delta, stderr=None)
-        observations.append(observe_from_result(source, judged, options.observe))
+        observations.append(observe_from_result(source, judged, observe))
         after_text = _save_output(context, "after", source, call["operation"], result)
         if before_result is not None and context.evidence is not None:
             context.evidence.save(

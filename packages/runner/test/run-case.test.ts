@@ -143,6 +143,26 @@ describe("runCase", () => {
     expect(result.verdict).toBe("fail");
   });
 
+  it("applies the plan's evidence.ignore to the collected logs", async () => {
+    const dirty = "ERROR expected rejection of recipient";
+    const plain = await runCase(
+      caseWith({}),
+      baseline,
+      registryWith(new HttpExecutor(sequencedFetch(201, dirty))),
+      context,
+    );
+    expect(plain.evidence.verdict).toBe("fail");
+
+    const ignoring = await runCase(
+      caseWith({ evidence: { sources: ["app_log"], ignore: ["expected rejection"] } }),
+      baseline,
+      registryWith(new HttpExecutor(sequencedFetch(201, dirty))),
+      context,
+    );
+    expect(ignoring.evidence.verdict).toBe("pass");
+    expect(ignoring.verdict).toBe("pass");
+  });
+
   it("is blocked, and runs nothing, when an override cannot mechanically reach the operation", async () => {
     const fetchFn = sequencedFetch(201, "all quiet");
     const registry = registryWith(new HttpExecutor(fetchFn));

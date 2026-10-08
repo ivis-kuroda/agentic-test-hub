@@ -11,7 +11,7 @@ TypeScript CLI's validated load when the test was generated.
 """
 
 from .assertion import AssertionOutcome, check_assertion, subject_of, text_of
-from .evidence import observe_browser, observe_from_result
+from .evidence import ObserveOptions, observe_browser, observe_from_result
 from .executors.browser import BrowserExecutor, PlaywrightDriver
 from .executors.extension import ExtensionExecutor
 from .executors.http import HttpExecutor
@@ -21,7 +21,7 @@ from .expectation import check_expectation
 from .manifest import Manifest, load_manifest
 from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
-from .run_case import CaseRunResult, compose_verdict, run_case
+from .run_case import CaseRunResult, RunOptions, compose_verdict, run_case
 from .run_scenario import ScenarioRunResult, StepRunResult, run_scenario, run_step
 from .state import PreparationReport, StateOutcome, ensure_state, prepare_states
 from .types import ExecutionContext, ExecutionResult, Executor, ExecutorError
@@ -41,8 +41,10 @@ __all__ = [
     "HttpExecutor",
     "Manifest",
     "Observation",
+    "ObserveOptions",
     "PlaywrightDriver",
     "PreparationReport",
+    "RunOptions",
     "ScenarioRunResult",
     "ShellExecutor",
     "SqlExecutor",

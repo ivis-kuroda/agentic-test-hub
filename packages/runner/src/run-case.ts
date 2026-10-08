@@ -118,9 +118,14 @@ export async function collectEvidence(
   context: ExecutionContext,
   options: RunOptions,
 ): Promise<Observation[]> {
+  // The plan's own `ignore` applies alongside any the caller supplied.
+  const observe: ObserveOptions = {
+    ...options.observe,
+    ignore: [...plan.ignore, ...(options.observe?.ignore ?? [])],
+  };
   const observations: Observation[] = [];
   if (options.browserSession !== undefined) {
-    observations.push(...observeBrowser(options.browserSession, options.observe));
+    observations.push(...observeBrowser(options.browserSession, observe));
   }
   for (const source of COLLECTED_BY_OPERATION) {
     if (!plan.sources.includes(source)) continue;
@@ -130,7 +135,7 @@ export async function collectEvidence(
     // `{{run.startedAt}}` to read only what this run logged).
     const params = renderDeep(call.params, context.scopes);
     const result = await registry.run(call.operation, params, context);
-    observations.push(observeFromResult(source, result, options.observe));
+    observations.push(observeFromResult(source, result, observe));
   }
   return observations;
 }

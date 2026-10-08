@@ -178,3 +178,23 @@ def test_a_failed_production_skips_dependants(context, registry_with) -> None:
     result = run_scenario(scenario, registry, context)
     assert result.steps[0].verdict == "fail"
     assert result.steps[1].skipped is not None
+
+
+def test_a_scenarios_evidence_ignore_suppresses_known_noise(context, registry_with) -> None:
+    def request(method, url, **kwargs):
+        if method == "POST":
+            return httpx.Response(201, json={"id": "n-1"})
+        return httpx.Response(200, text="ERROR expected rejection\nall quiet")
+
+    fetch = type("Fetch", (), {"request": staticmethod(request)})()
+    plan = {"sources": ["app_log"], "timing": "after"}
+
+    noisy = run_scenario(_scenario(evidence=plan), registry_with(fetch), context)
+    assert noisy.evidence is not None and noisy.evidence.verdict == "fail"
+
+    ignored = run_scenario(
+        _scenario(evidence={**plan, "ignore": ["expected rejection"]}),
+        registry_with(fetch),
+        context,
+    )
+    assert ignored.evidence is not None and ignored.evidence.verdict == "pass"
