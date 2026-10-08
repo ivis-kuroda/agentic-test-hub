@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from .template import TemplateError, render_deep
 from .types import ExecutionContext, ExecutionResult, Executor, ExecutorError
 
 
@@ -32,11 +33,17 @@ class ExecutorRegistry:
         """
         Runs a declared operation by id.
 
-        Arguments are placed in the `param` scope, so a manifest refers to
-        them as `{{param.name}}` regardless of how the operation is invoked.
+        Arguments are rendered, then placed in the `param` scope, so a manifest
+        refers to them as `{{param.name}}` regardless of how the operation is
+        invoked. Rendering uses the context's own scopes (`env`, `step`, `run`
+        and any `param` already present), so a spec can pass
+        `token: "{{env.TOKEN}}"` or `recid: "{{step.recid}}"`. A string that is
+        a single placeholder keeps a structured value as it is.
 
         @raises ExecutorError: When the operation or its executor is
-            unavailable, or a declared param is missing.
+            unavailable, a declared param is missing, or a placeholder in a
+            param cannot be resolved (the message names operation, param and
+            placeholder).
         """
         operation = context.manifest.operations.get(operation_id)
         if operation is None:
@@ -59,7 +66,17 @@ class ExecutorRegistry:
                 f"operation {operation_id} needs {', '.join(missing)}", operation_id
             )
 
-        merged_param = {**(context.scopes.get("param") or {}), **params}
+        rendered: dict[str, Any] = {}
+        for name, value in params.items():
+            try:
+                rendered[name] = render_deep(value, context.scopes)
+            except TemplateError as cause:
+                raise ExecutorError(
+                    f'operation {operation_id}: param "{name}": {cause}',
+                    operation_id,
+                ) from cause
+
+        merged_param = {**(context.scopes.get("param") or {}), **rendered}
         merged_context = replace(context, scopes={**context.scopes, "param": merged_param})
 
         # Executors that save evidence name their files after the operation id.

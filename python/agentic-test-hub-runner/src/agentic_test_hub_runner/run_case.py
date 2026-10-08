@@ -40,7 +40,6 @@ from .policy import DEFAULT_VERDICT_POLICY, VerdictPolicy
 from .registry import ExecutorRegistry
 from .run_scope import with_evidence_target, with_run_scope
 from .state import PreparationReport, prepare_states
-from .template import render_deep
 from .types import ExecutionContext, ExecutionResult
 from .verdict import EvidenceWaiver, Observation, Verdict, VerdictResult, evaluate_verdict
 
@@ -132,12 +131,6 @@ def wants_before(plan: dict[str, Any], context: ExecutionContext) -> bool:
     return context.evidence is not None and timing != "on_failure"
 
 
-def _collector_params(call: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
-    # A collector's params may reference the run's own scopes (for example
-    # `{{run.startedAt}}` to read only what this run logged).
-    return render_deep(call.get("params", {}), context.scopes)
-
-
 def _save_output(
     context: ExecutionContext, phase: Phase, source: str, name: str, result: ExecutionResult
 ) -> str:
@@ -172,7 +165,7 @@ def collect_before(
         if source not in plan.get("sources", []) or call is None:
             continue
         try:
-            result = registry.run(call["operation"], _collector_params(call, context), context)
+            result = registry.run(call["operation"], call.get("params", {}), context)
         except Exception as cause:
             if context.evidence is not None:
                 context.evidence.store.warn(
@@ -227,7 +220,7 @@ def collect_evidence(
         call = context.manifest.evidence.get(source)
         if call is None:
             continue
-        result = registry.run(call["operation"], _collector_params(call, context), context)
+        result = registry.run(call["operation"], call.get("params", {}), context)
         judged = result
         before_result = before.get(source)
         if (

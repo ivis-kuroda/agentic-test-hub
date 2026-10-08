@@ -12,7 +12,6 @@ import {
   type VerdictPolicy,
   type VerdictResult,
 } from "@agentic-test-hub/core";
-import { renderDeep } from "@agentic-test-hub/plugin";
 
 import { deriveActionParams } from "./derive-params.ts";
 import {
@@ -131,10 +130,9 @@ export async function collectEvidence(
     if (!plan.sources.includes(source)) continue;
     const call = context.manifest.evidence[source];
     if (call === undefined) continue;
-    // A collector's params may reference the run's own scopes (for example
-    // `{{run.startedAt}}` to read only what this run logged).
-    const params = renderDeep(call.params, context.scopes);
-    const result = await registry.run(call.operation, params, context);
+    // The registry renders the params against the run's own scopes (for
+    // example `{{run.startedAt}}` to read only what this run logged).
+    const result = await registry.run(call.operation, call.params, context);
     observations.push(observeFromResult(source, result, observe));
   }
   return observations;

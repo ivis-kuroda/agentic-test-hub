@@ -60,4 +60,24 @@ describe("ExecutorRegistry", () => {
     expect(result.ok).toBe(true);
     await expect(registry.run("OP-SEND-AUTH", {}, contextFor())).rejects.toThrow(/needs channel/);
   });
+
+  it("renders params against the context scopes before they reach the param scope", async () => {
+    const fetchFn = recordingFetch();
+    const registry = registryWith(new HttpExecutor(fetchFn));
+    await registry.run(
+      "OP-SEND-AUTH",
+      { channel: "{{step.recid}}", token: "{{env.SECRET_VALUE}}" },
+      contextFor({ scopes: { env: { SECRET_VALUE: "tok-1" }, step: { recid: "42" } } }),
+    );
+    const call = fetchFn.calls[0];
+    expect(call?.init.body).toBe(JSON.stringify({ channel: "42" }));
+    expect(new Headers(call?.init.headers).get("authorization")).toBe("Bearer tok-1");
+  });
+
+  it("names the operation, param and placeholder when a param placeholder is unresolved", async () => {
+    const registry = registryWith(new HttpExecutor(recordingFetch()));
+    await expect(
+      registry.run("OP-SEND", { channel: "{{env.NOT_SET}}" }, contextFor({ scopes: { env: {} } })),
+    ).rejects.toThrow(/OP-SEND.*param "channel".*env\.NOT_SET/);
+  });
 });
