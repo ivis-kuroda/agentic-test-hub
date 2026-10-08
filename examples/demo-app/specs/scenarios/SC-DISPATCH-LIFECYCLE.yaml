@@ -51,6 +51,7 @@ steps:
       - S-LIST
     produces: {}
     viewpoints: []
+cleanup: []
 evidenceWaivers: []
 tags: []
 viewpoints: []
