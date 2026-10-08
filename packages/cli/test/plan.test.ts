@@ -7,6 +7,7 @@ import {
   executorKindsFor,
   operationsTouched,
   planGeneration,
+  pythonOnlyFeatures,
   type PlanOutcome,
 } from "../src/plan.ts";
 
@@ -241,6 +242,61 @@ describe("planGeneration", () => {
     expect(ts.refusal.reason).toContain("OP-UPLOAD");
     expect(ts.refusal.reason).toContain("--lang python");
     expectOk(planGeneration(suite, manifest, "TC-UP", "python"));
+  });
+
+  it("refuses typescript for a scenario that only uses multipart in a cleanup step", () => {
+    const scenario = Scenario.parse({
+      id: "SC-CLEANUP-UP",
+      title: "cleanup uploads",
+      steps: [
+        {
+          id: "S-1",
+          summary: "send",
+          action: { operation: "OP-SEND", params: { channel: "email" } },
+          expect: [{ kind: "http_status", status: 201 }],
+        },
+      ],
+      cleanup: [
+        {
+          id: "S-UP",
+          summary: "upload",
+          action: { operation: "OP-UPLOAD", params: { title: "t" } },
+        },
+      ],
+    });
+    const suite = suiteWith({ scenarios: [scenario] });
+    const ts = planGeneration(suite, manifest, "SC-CLEANUP-UP", "typescript");
+    expectRefused(ts);
+    expect(ts.refusal.reason).toContain("OP-UPLOAD");
+    const py = planGeneration(suite, manifest, "SC-CLEANUP-UP", "python");
+    expectOk(py);
+    if (py.plan.kind !== "scenario") throw new Error("expected a scenario plan");
+    expect(operationsTouched(py.plan, manifest)).toContain("OP-UPLOAD");
+  });
+
+  it("reports which Python-only features a plan uses", () => {
+    const uploadBaseline = Baseline.parse({
+      ...baseline,
+      id: "BL-UPLOAD2",
+      action: { operation: "OP-UPLOAD", params: { title: "t" } },
+    });
+    const suite = suiteWith({
+      baselines: [uploadBaseline],
+      cases: [caseWith("TC-UP2", { baseline: "BL-UPLOAD2" })],
+    });
+    const plain = planGeneration(suite, manifest, "TC-UP2", "python");
+    expectOk(plain);
+    expect(pythonOnlyFeatures(plain.plan, manifest)).toEqual([
+      "operation(s) OP-UPLOAD send multipart/form-data bodies",
+    ]);
+    const ok = planGeneration(
+      suiteWith({ cases: [caseWith("TC-OK", {})] }),
+      manifest,
+      "TC-OK",
+      "python",
+    );
+    expectOk(ok);
+    expect(pythonOnlyFeatures(ok.plan, manifest)).toEqual([]);
   });
 
   it("includes a precondition's ensure/verify operations, so their executor is registered too", () => {

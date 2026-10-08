@@ -225,6 +225,15 @@ already supplied one: `{{run.startedAt}}` (UTC ISO-8601, seconds, `Z`) and
 rendered with the context scopes, so a collector can read only what this run
 produced, for example `since: "{{run.startedAt}}"`.
 
+## Runtime parity
+
+Python is the primary runtime; the TypeScript runner mirrors it where the
+shared schema types force it. Everything above except `multipart` runs on
+both. `ath-generate-test --lang typescript` refuses a plan that uses a
+Python-only feature (`pythonOnlyFeatures` in `packages/cli/src/plan.ts`,
+alongside the unsupported-executor check) and says to use `--lang python`.
+Add a feature there when it cannot be implemented in the TypeScript runner.
+
 ## AI at authoring time, deterministic code at run time
 
 Running an agent for every test execution is slow, expensive and

@@ -30,6 +30,15 @@ operations:
     body:
       channel: "{{param.channel}}"
 
+  OP-UPLOAD:
+    executor: http
+    connection: api
+    method: POST
+    path: /files
+    params: []
+    multipart:
+      - { name: file, file: fixtures/a.txt }
+
   OP-SEED-DB:
     executor: sql
     connection: postgres
@@ -90,6 +99,30 @@ async function setupSpecs(): Promise<{ specsDir: string; pluginPath: string; plu
       summary: "sends over sms",
       baseline: "BL-TEST",
       overrides: [{ path: "context.body.channel", op: "set", value: "sms" }],
+      expect: [{ kind: "http_status", status: 201, viewpoints: [] }],
+      polarity: "nominal",
+      priority: "P2",
+      viewpoints: [],
+    },
+  });
+  await store.save({
+    kind: "baseline",
+    entity: {
+      id: "BL-UPLOAD",
+      title: "upload a file",
+      preconditions: [],
+      config: {},
+      context: {},
+      action: { operation: "OP-UPLOAD", params: {} },
+    },
+  });
+  await store.save({
+    kind: "case",
+    entity: {
+      id: "TC-UPLOAD",
+      summary: "uploads a file",
+      baseline: "BL-UPLOAD",
+      overrides: [],
       expect: [{ kind: "http_status", status: 201, viewpoints: [] }],
       polarity: "nominal",
       priority: "P2",
@@ -190,6 +223,39 @@ describe("main (ath-generate-test)", () => {
     expect(stderr.join("")).toContain("OP-SEED-DB");
 
     await expect(stat(join(pluginRoot, "generated", "TC-SQL.spec.ts"))).rejects.toThrow();
+  });
+
+  it("refuses typescript for a multipart operation with a clear message, but generates python", async () => {
+    const { specsDir, pluginPath, pluginRoot } = await setupSpecs();
+    const refused = fakeIo();
+    const code = await main(
+      ["TC-UPLOAD", "--specs", specsDir, "--plugin", pluginPath, "--plugin-root", pluginRoot],
+      refused.io,
+    );
+    expect(code).toBe(1);
+    expect(refused.stderr.join("")).toContain("multipart");
+    expect(refused.stderr.join("")).toContain("--lang python");
+    await expect(stat(join(pluginRoot, "generated", "TC-UPLOAD.spec.ts"))).rejects.toThrow();
+
+    const accepted = fakeIo();
+    const pythonCode = await main(
+      [
+        "TC-UPLOAD",
+        "--specs",
+        specsDir,
+        "--plugin",
+        pluginPath,
+        "--plugin-root",
+        pluginRoot,
+        "--lang",
+        "python",
+      ],
+      accepted.io,
+    );
+    expect(accepted.stderr.join("")).toBe("");
+    expect(pythonCode).toBe(0);
+    const generated = await readFile(join(pluginRoot, "generated", "test_tc_upload.py"), "utf8");
+    expect(generated).toContain("run_case(TEST_CASE, RESOLVED, ACTION_PARAMS, registry, context)");
   });
 
   it("generates a Python test when --lang python is passed", async () => {

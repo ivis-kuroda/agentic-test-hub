@@ -1,6 +1,9 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { Baseline, TestCase } from "@agentic-test-hub/core";
+import { Baseline, Scenario, TestCase } from "@agentic-test-hub/core";
 import { loadManifest, type PluginManifest } from "@agentic-test-hub/plugin";
 
 import { planGeneration } from "../src/plan.ts";
@@ -28,6 +31,25 @@ operations:
     params: [channel]
     body:
       channel: "{{param.channel}}"
+
+  OP-UPLOAD:
+    executor: http
+    connection: api
+    method: POST
+    path: /files
+    params: [title]
+    optionalParams: [token]
+    headers:
+      Authorization: "Bearer {{param.token}}"
+    multipart:
+      - { name: file, file: fixtures/a.txt, filename: "" }
+      - { name: title, value: "{{param.title}}" }
+
+  OP-DELETE:
+    executor: http
+    connection: api
+    method: DELETE
+    path: "/files/{{step.recid}}"
 
   OP-SEED-INDEX:
     executor: extension
@@ -220,5 +242,130 @@ describe("renderSpecFilePy", () => {
         outPath: "/plugin/generated/TC-EXT.test.py",
       }),
     ).toThrow(/extensionsModule/);
+  });
+
+  describe("generated output using the extended features", () => {
+    const uploadBaseline = Baseline.parse({
+      id: "BL-UPLOAD",
+      title: "upload",
+      preconditions: [],
+      config: {},
+      context: {},
+      action: { operation: "OP-UPLOAD", params: { title: "t", token: "s" } },
+    });
+    const uploadCase = TestCase.parse({
+      id: "TC-UPLOAD",
+      summary: "uploads without a token",
+      baseline: "BL-UPLOAD",
+      overrides: [{ path: "action.params.token", op: "remove" }],
+      expect: [
+        { kind: "http_status", status: 401, alsoAccepts: [403], viewpoints: [] },
+        { kind: "result", assert: { kind: "keys", at: "body", value: ["error"] }, viewpoints: [] },
+        {
+          kind: "result",
+          assert: { kind: "compare", at: "durationMs", op: "lt", value: 5000 },
+          viewpoints: [],
+        },
+      ],
+      polarity: "error",
+      priority: "P2",
+      viewpoints: [],
+    });
+    const uploadScenario = Scenario.parse({
+      id: "SC-UPLOAD",
+      title: "upload, read the location, clean up",
+      steps: [
+        {
+          id: "S-1",
+          summary: "upload",
+          action: { operation: "OP-UPLOAD", params: { title: "t", token: "s" } },
+          expect: [{ kind: "http_status", status: 201 }],
+          produces: { recid: { from: "headers.location", pattern: "/files/(\\d+)$" } },
+        },
+      ],
+      cleanup: [{ id: "S-DEL", summary: "delete", action: { operation: "OP-DELETE" } }],
+    });
+    const suite = {
+      viewpoints: [],
+      factors: [],
+      matrices: [],
+      baselines: [uploadBaseline],
+      cases: [uploadCase],
+      scenarios: [uploadScenario],
+    };
+    const target = (id: string) => ({
+      manifestPath: "/plugin/plugin.yaml",
+      pluginRoot: "/plugin",
+      outPath: `/plugin/generated/${id}.py`,
+    });
+
+    function render(id: string): string {
+      const outcome = planGeneration(suite, manifest, id, "python");
+      if (!outcome.ok) throw new Error(outcome.refusal.reason);
+      return renderSpecFilePy(outcome.plan, manifest, target(id));
+    }
+
+    /** Names the generated file imports from the runtime package. */
+    function importedNames(source: string): string[] {
+      const block = /from agentic_test_hub_runner import \(([^)]*)\)/s.exec(source);
+      if (block?.[1] === undefined) throw new Error("no runtime import block");
+      return block[1]
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
+    }
+
+    const runtimeExports = (() => {
+      const init = readFileSync(
+        new URL(
+          "../../../python/agentic-test-hub-runner/src/agentic_test_hub_runner/__init__.py",
+          import.meta.url,
+        ),
+        "utf8",
+      );
+      const all = /__all__ = \[([^\]]*)\]/s.exec(init)?.[1] ?? "";
+      return new Set([...all.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+    })();
+
+    it.each(["TC-UPLOAD", "SC-UPLOAD"])(
+      "%s imports only names the Python runtime package exports",
+      (id) => {
+        const rendered = render(id);
+        const names = importedNames(rendered);
+        expect(names).toContain("HttpExecutor");
+        expect(names.filter((name) => !runtimeExports.has(name))).toEqual([]);
+      },
+    );
+
+    it("inlines the derived params (optional token removed) and the new expectation fields", () => {
+      const rendered = render("TC-UPLOAD");
+      expect(rendered).toContain("ACTION_PARAMS = json.loads(");
+      expect(rendered).not.toContain('\\"token\\"');
+      expect(rendered).toContain("alsoAccepts");
+      expect(rendered).toContain('\\"kind\\": \\"keys\\"');
+    });
+
+    it("inlines a scenario's cleanup and pattern produces", () => {
+      const rendered = render("SC-UPLOAD");
+      expect(rendered).toContain("S-DEL");
+      expect(rendered).toContain("headers.location");
+      expect(rendered).toContain("run_scenario(SCENARIO, registry, context)");
+    });
+
+    const python = spawnSync("python3", ["--version"]);
+    it.skipIf(python.error !== undefined)("renders syntactically valid Python", () => {
+      for (const id of ["TC-UPLOAD", "SC-UPLOAD"]) {
+        const checked = spawnSync(
+          "python3",
+          ["-c", "import ast, sys; ast.parse(sys.stdin.read())"],
+          {
+            input: render(id),
+            encoding: "utf8",
+          },
+        );
+        expect(checked.stderr).toBe("");
+        expect(checked.status).toBe(0);
+      }
+    });
   });
 });
