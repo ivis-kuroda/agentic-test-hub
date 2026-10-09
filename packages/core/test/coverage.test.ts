@@ -26,7 +26,10 @@ describe("buildMatrixView", () => {
 
   it("marks a combination a case exercises as covered", () => {
     const cell = cellAt("L-VALID", "L-EMAIL");
-    expect(cell.state).toEqual({ kind: "covered", cases: ["TC-DISPATCH-001", "TC-DISPATCH-004"] });
+    expect(cell.state).toEqual({
+      kind: "covered",
+      cases: ["TC-DISPATCH-001", "TC-DISPATCH-004"],
+    });
   });
 
   it("marks a combination nobody wrote a case for as a gap", () => {
@@ -48,8 +51,15 @@ describe("buildMatrixView", () => {
   });
 
   it("reports a case whose baseline is unknown rather than dropping it", () => {
-    const orphan = { ...cases[0]!, id: "TC-DISPATCH-099", baseline: "BL-MISSING" };
-    const view = buildMatrixView(matrix, { ...suite, cases: [...cases, orphan] });
+    const orphan = {
+      ...cases[0]!,
+      id: "TC-DISPATCH-099",
+      baseline: "BL-MISSING",
+    };
+    const view = buildMatrixView(matrix, {
+      ...suite,
+      cases: [...cases, orphan],
+    });
     expect(view.unplaced).toContain("TC-DISPATCH-099");
   });
 
@@ -58,7 +68,10 @@ describe("buildMatrixView", () => {
       ...matrix,
       exclusions: [
         ...matrix.exclusions,
-        { when: { "F-RETRY": "L-OFF" }, reason: "retry is out of scope for this release" },
+        {
+          when: { "F-RETRY": "L-OFF" },
+          reason: "retry is out of scope for this release",
+        },
       ],
     });
     const view = buildMatrixView(offAxis, suite);
@@ -76,7 +89,10 @@ describe("buildMatrixView", () => {
   });
 
   it("rejects a matrix naming a factor that does not exist", () => {
-    const broken = Matrix.parse({ ...matrix, axes: { rows: "F-NOPE", cols: "F-CHANNEL" } });
+    const broken = Matrix.parse({
+      ...matrix,
+      axes: { rows: "F-NOPE", cols: "F-CHANNEL" },
+    });
     expect(() => buildMatrixView(broken, suite)).toThrow(/unknown factor/);
   });
 });
@@ -90,6 +106,20 @@ describe("buildViewpointCoverage", () => {
   it("finds cases that name a viewpoint only on an expectation", () => {
     const [auth] = buildViewpointCoverage(viewpoints, cases, []);
     expect(auth?.cases).toContain("TC-DISPATCH-003");
+  });
+
+  it("reports which referencing cases are not_runnable", () => {
+    const marked = cases.map((testCase) =>
+      testCase.id === "TC-DISPATCH-001"
+        ? {
+            ...testCase,
+            automation: { status: "not_runnable" as const, reason: "r" },
+          }
+        : testCase,
+    );
+    const [auth] = buildViewpointCoverage(viewpoints, marked, []);
+    expect(auth?.notRunnableCases).toEqual(["TC-DISPATCH-001"]);
+    expect(auth?.cases).toContain("TC-DISPATCH-001");
   });
 
   it("flags a viewpoint nothing references", () => {

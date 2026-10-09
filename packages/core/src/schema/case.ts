@@ -31,7 +31,15 @@ export const AutomationStatus = z.enum([
   "generated",
   /** Code exists and has been seen to pass and to fail for the right reason. */
   "verified",
+  /**
+   * Cannot be run by machine without modifying the target's own source (or
+   * for another stated reason). Needs `automation.reason`; generation is
+   * refused, and exports show it apart from `manual`.
+   */
+  "not_runnable",
 ]);
+/** How far a case has progressed towards being executed by machine. */
+export type AutomationStatus = z.infer<typeof AutomationStatus>;
 
 /**
  * One point in the condition space: the baseline with a stated set of
@@ -98,6 +106,19 @@ export const TestCase = z.object({
       status: AutomationStatus.default("manual"),
       /** Path to the generated test, relative to the plugin repository. */
       impl: z.string().min(1).optional(),
+      /**
+       * Why the case cannot be run: without modifying the target's source,
+       * or otherwise. Required when `status` is `not_runnable` (reported by
+       * `validateSuite`); meaningless for other statuses.
+       */
+      reason: z.string().min(1).optional(),
+      /** When the runnability was last checked, as an ISO 8601 date (`2026-10-09`) or date-time. */
+      checkedAt: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:\d{2})?)?$/, "expected an ISO 8601 date")
+        .optional(),
+      /** How or by whom it was checked, e.g. "code path review of <file>". Free text. */
+      checkedBy: z.string().min(1).optional(),
     })
     .default({ status: "manual" }),
   ...traceableFields,

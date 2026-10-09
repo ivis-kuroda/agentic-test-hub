@@ -166,6 +166,12 @@ export function validateSuite(suite: Suite): SuiteProblem[] {
     if (!baselineIds.has(testCase.baseline)) {
       error(at, `refers to baseline ${testCase.baseline}, which does not exist`);
     }
+    if (testCase.automation.status === "not_runnable" && testCase.automation.reason === undefined) {
+      error(
+        `${at}.automation`,
+        "status is not_runnable but no reason is given: say why it cannot be run",
+      );
+    }
     requireViewpoints(`${at}.viewpoints`, testCase.viewpoints);
     for (const [index, expectation] of testCase.expect.entries()) {
       requireViewpoints(`${at}.expect[${index}]`, expectation.viewpoints);

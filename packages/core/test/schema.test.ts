@@ -63,7 +63,10 @@ describe("expectations", () => {
   });
 
   it("treats a result assertion as mechanical unless it is prose", () => {
-    const keys = Expectation.parse({ kind: "result", assert: { kind: "keys", value: ["a"] } });
+    const keys = Expectation.parse({
+      kind: "result",
+      assert: { kind: "keys", value: ["a"] },
+    });
     expect(isMechanical(keys)).toBe(true);
     const prose = Expectation.parse({
       kind: "result",
@@ -80,22 +83,38 @@ describe("expectations", () => {
     });
     expect(ok.kind).toBe("operation_result");
     expect(
-      Expectation.safeParse({ kind: "result", assert: { kind: "compare", op: "eq", value: 3 } })
-        .success,
+      Expectation.safeParse({
+        kind: "result",
+        assert: { kind: "compare", op: "eq", value: 3 },
+      }).success,
     ).toBe(false);
     expect(
-      Expectation.safeParse({ kind: "result", assert: { kind: "one_of", values: [] } }).success,
+      Expectation.safeParse({
+        kind: "result",
+        assert: { kind: "one_of", values: [] },
+      }).success,
     ).toBe(false);
     expect(
-      Expectation.safeParse({ kind: "http_status", status: 201, alsoAccepts: [200, 99] }).success,
+      Expectation.safeParse({
+        kind: "http_status",
+        status: 201,
+        alsoAccepts: [200, 99],
+      }).success,
     ).toBe(false);
     expect(
-      Expectation.parse({ kind: "http_status", status: 201, alsoAccepts: [200] }),
+      Expectation.parse({
+        kind: "http_status",
+        status: 201,
+        alsoAccepts: [200],
+      }),
     ).toHaveProperty("alsoAccepts", [200]);
   });
 
   it("carries an unverifiable imported claim verbatim, and marks it as such", () => {
-    const imported = Expectation.parse({ kind: "unspecified", text: "an error is returned" });
+    const imported = Expectation.parse({
+      kind: "unspecified",
+      text: "an error is returned",
+    });
     expect(isMechanical(imported)).toBe(false);
     expect(imported).toHaveProperty("text", "an error is returned");
   });
@@ -123,7 +142,11 @@ describe("viewpoints", () => {
 describe("factors", () => {
   it("refuses a factor with fewer than two levels, which would not vary", () => {
     expect(() =>
-      Factor.parse({ id: "F-X", name: "x", levels: [{ id: "L-A", name: "a" }] }),
+      Factor.parse({
+        id: "F-X",
+        name: "x",
+        levels: [{ id: "L-A", name: "a" }],
+      }),
     ).toThrow();
   });
 });
@@ -150,6 +173,32 @@ describe("cases", () => {
 
   it("defaults automation to manual, so imported cases are not claimed as automated", () => {
     expect(TestCase.parse(minimal).automation.status).toBe("manual");
+  });
+
+  it("accepts not_runnable with reason, checkedAt and checkedBy", () => {
+    const parsed = TestCase.parse({
+      ...minimal,
+      automation: {
+        status: "not_runnable",
+        reason: "needs a code change to the target to force the failure",
+        checkedAt: "2026-10-09",
+        checkedBy: "code path review of src/main.c",
+      },
+    });
+    expect(parsed.automation).toMatchObject({
+      status: "not_runnable",
+      checkedAt: "2026-10-09",
+      checkedBy: "code path review of src/main.c",
+    });
+  });
+
+  it("refuses a checkedAt that is not an ISO date", () => {
+    expect(() =>
+      TestCase.parse({
+        ...minimal,
+        automation: { status: "manual", checkedAt: "yesterday" },
+      }),
+    ).toThrow();
   });
 });
 

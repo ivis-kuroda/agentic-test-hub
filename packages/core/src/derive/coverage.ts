@@ -137,14 +137,22 @@ export function buildMatrixView(matrix: Matrix, suite: SuiteSlice): MatrixView {
       const hit = placed.get(`${row.id}${KEY_SEP}${col.id}`);
       if (hit && hit.length > 0) {
         covered += 1;
-        return { row, col, state: { kind: "covered", cases: hit } as CellState };
+        return {
+          row,
+          col,
+          state: { kind: "covered", cases: hit } as CellState,
+        };
       }
       const exclusion = matrix.exclusions.find((candidate) =>
         appliesToCell(candidate, rowFactor.id, colFactor.id, row.id, col.id),
       );
       if (exclusion) {
         excluded += 1;
-        return { row, col, state: { kind: "excluded", reason: exclusion.reason } as CellState };
+        return {
+          row,
+          col,
+          state: { kind: "excluded", reason: exclusion.reason } as CellState,
+        };
       }
       gap += 1;
       return { row, col, state: { kind: "gap" } as CellState };
@@ -167,6 +175,12 @@ export interface ViewpointCoverage {
   readonly viewpoint: Viewpoint;
   /** Cases naming this viewpoint, directly or through an expectation. */
   readonly cases: readonly string[];
+  /**
+   * The subset of `cases` whose automation status is `not_runnable`. They
+   * still count as covering the viewpoint on paper, but no run can ever
+   * confirm it, which a reader should see.
+   */
+  readonly notRunnableCases: readonly string[];
   /** Scenario steps naming it, as `scenarioId/stepId`. */
   readonly steps: readonly string[];
   /** True when nothing references it — a claim the suite does not check. */
@@ -192,12 +206,14 @@ export function buildViewpointCoverage(
   scenarios: readonly Scenario[],
 ): ViewpointCoverage[] {
   return viewpoints.map((viewpoint) => {
-    const matchedCases = cases
-      .filter(
-        (testCase) =>
-          testCase.viewpoints.includes(viewpoint.id) ||
-          testCase.expect.some((expectation) => expectation.viewpoints.includes(viewpoint.id)),
-      )
+    const matched = cases.filter(
+      (testCase) =>
+        testCase.viewpoints.includes(viewpoint.id) ||
+        testCase.expect.some((expectation) => expectation.viewpoints.includes(viewpoint.id)),
+    );
+    const matchedCases = matched.map((testCase) => testCase.id);
+    const notRunnableCases = matched
+      .filter((testCase) => testCase.automation.status === "not_runnable")
       .map((testCase) => testCase.id);
 
     const matchedSteps = scenarios.flatMap((scenario) =>
@@ -213,6 +229,7 @@ export function buildViewpointCoverage(
     return {
       viewpoint,
       cases: matchedCases,
+      notRunnableCases,
       steps: matchedSteps,
       uncovered: matchedCases.length === 0 && matchedSteps.length === 0,
     };

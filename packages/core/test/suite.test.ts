@@ -78,12 +78,18 @@ describe("validateSuite", () => {
   });
 
   it("catches a matrix axis pointing at a factor that does not exist", () => {
-    const broken = Matrix.parse({ ...matrix, axes: { rows: "F-GONE", cols: "F-CHANNEL" } });
+    const broken = Matrix.parse({
+      ...matrix,
+      axes: { rows: "F-GONE", cols: "F-CHANNEL" },
+    });
     expect(errorsOf({ ...sound, matrices: [broken] })[0]).toMatch(/factor F-GONE/);
   });
 
   it("catches a matrix using one factor for both axes", () => {
-    const broken = Matrix.parse({ ...matrix, axes: { rows: "F-AUTH", cols: "F-AUTH" } });
+    const broken = Matrix.parse({
+      ...matrix,
+      axes: { rows: "F-AUTH", cols: "F-AUTH" },
+    });
     expect(errorsOf({ ...sound, matrices: [broken] })[0]).toMatch(/same factor for both axes/);
   });
 
@@ -96,7 +102,10 @@ describe("validateSuite", () => {
   });
 
   it("catches a factor declaring the same level twice", () => {
-    const broken = { ...authFactor, levels: [...authFactor.levels, authFactor.levels[0]!] };
+    const broken = {
+      ...authFactor,
+      levels: [...authFactor.levels, authFactor.levels[0]!],
+    };
     expect(errorsOf({ ...sound, factors: [broken, channelFactor] })[0]).toMatch(
       /declared more than once/,
     );
@@ -132,7 +141,11 @@ describe("validateSuite", () => {
           expect: [{ kind: "http_status", status: 200 }],
           dependsOn: ["S-2"],
         },
-        { id: "S-2", summary: "second", expect: [{ kind: "http_status", status: 200 }] },
+        {
+          id: "S-2",
+          summary: "second",
+          expect: [{ kind: "http_status", status: 200 }],
+        },
       ],
     });
     expect(errorsOf({ ...sound, scenarios: [scenario] })[0]).toMatch(/does not appear earlier/);
@@ -158,7 +171,13 @@ describe("validateSuite", () => {
     const scenario = Scenario.parse({
       id: "SC-X",
       title: "t",
-      steps: [{ id: "S-1", summary: "first", expect: [{ kind: "http_status", status: 200 }] }],
+      steps: [
+        {
+          id: "S-1",
+          summary: "first",
+          expect: [{ kind: "http_status", status: 200 }],
+        },
+      ],
       cleanup: [{ id: "S-1", summary: "tidy" }],
     });
     expect(errorsOf({ ...sound, scenarios: [scenario] })[0]).toMatch(/declared more than once/);
@@ -170,7 +189,11 @@ describe("validateSuite", () => {
       title: "t",
       viewpoints: ["VP-AUTH"],
       steps: [
-        { id: "S-1", summary: "first", expect: [{ kind: "http_status", status: 200 }] },
+        {
+          id: "S-1",
+          summary: "first",
+          expect: [{ kind: "http_status", status: 200 }],
+        },
         {
           id: "S-2",
           summary: "second",
@@ -185,6 +208,32 @@ describe("validateSuite", () => {
   it("catches a viewpoint listing itself as a parent", () => {
     const broken = { ...authViewpoint, parents: [authViewpoint.id] };
     expect(errorsOf({ ...sound, viewpoints: [broken] })[0]).toMatch(/lists itself/);
+  });
+});
+
+describe("not_runnable automation", () => {
+  it("is an error without a reason", () => {
+    const suite: Suite = {
+      ...sound,
+      cases: [{ ...caseNoAuth, automation: { status: "not_runnable" } }],
+    };
+    expect(errorsOf(suite).join("\n")).toContain("not_runnable but no reason");
+  });
+
+  it("is accepted with a reason", () => {
+    const suite: Suite = {
+      ...sound,
+      cases: [
+        {
+          ...caseNoAuth,
+          automation: {
+            status: "not_runnable",
+            reason: "needs a source change",
+          },
+        },
+      ],
+    };
+    expect(errorsOf(suite).join("\n")).not.toContain("not_runnable");
   });
 });
 
