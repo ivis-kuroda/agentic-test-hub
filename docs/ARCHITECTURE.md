@@ -309,6 +309,14 @@ run ends (`registry.close_all()`, called by `run_case`/`run_scenario` in a
 `finally`) and the runner reads that session's console and network for the
 verdict, so a policy binding `browser_console` now sees real page errors.
 
+**Browser TLS.** The Python `PlaywrightOptions.ignore_https_errors` (default
+off) is passed to `browser.new_context(ignore_https_errors=...)` so targets
+served with a throwaway or self-signed certificate can be driven. Left unset
+(`None`), the environment variable `ATH_BROWSER_IGNORE_HTTPS_ERRORS=1` (also
+`true`/`yes`/`on`) turns it on, which lets an environment enable it without
+editing generated test code; an explicit `True`/`False` always wins over the
+variable.
+
 **Masking.** Everything text written is masked first. Values of the
 `Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization` and
 `X-API-Key` headers (any case) and of headers matching the manifest's
