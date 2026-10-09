@@ -1,8 +1,9 @@
 <script setup lang="ts">
 const { data } = await useFetch("/api/suite");
 
-const automationColor: Record<string, "neutral" | "warning" | "success"> = {
+const automationColor: Record<string, "neutral" | "warning" | "success" | "error"> = {
   manual: "neutral",
+  not_runnable: "error",
   generated: "warning",
   verified: "success",
 };
@@ -33,7 +34,11 @@ const automationColor: Record<string, "neutral" | "warning" | "success"> = {
       </template>
       <template #automation-cell="{ row }">
         <UBadge :color="automationColor[row.original.automation.status]" variant="subtle" size="sm">
-          {{ row.original.automation.status }}
+          {{
+            row.original.automation.status === "not_runnable"
+              ? "not runnable (実施不可)"
+              : row.original.automation.status
+          }}
         </UBadge>
       </template>
     </UTable>

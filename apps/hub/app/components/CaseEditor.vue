@@ -36,8 +36,12 @@ export interface CaseDraft {
   appliesToCommit: string;
   appliesToBranch: string;
   appliesToRelease: string;
-  automationStatus: "manual" | "generated" | "verified";
+  automationStatus: "manual" | "generated" | "verified" | "not_runnable";
   automationImpl: string;
+  /** Why the case cannot be run; required by the schema checks when status is not_runnable. */
+  automationReason: string;
+  automationCheckedAt: string;
+  automationCheckedBy: string;
   viewpoints: string[];
   note: string;
 }
@@ -302,6 +306,7 @@ function removeTag(index: number): void {
             { label: 'manual', value: 'manual' },
             { label: 'generated', value: 'generated' },
             { label: 'verified', value: 'verified' },
+            { label: 'not runnable (実施不可)', value: 'not_runnable' },
           ]"
           class="w-full"
         />
@@ -309,6 +314,33 @@ function removeTag(index: number): void {
       <UFormField label="Automation impl" description="Path to the generated test.">
         <UInput v-model="model.automationImpl" class="w-full" />
       </UFormField>
+    </div>
+
+    <div v-if="model.automationStatus === 'not_runnable'" class="space-y-4">
+      <UFormField
+        label="Not-runnable reason"
+        required
+        :error="model.automationReason.trim() === '' ? 'A reason is required.' : undefined"
+        description="Why this cannot be run without modifying the target's source, or otherwise."
+      >
+        <UTextarea
+          v-model="model.automationReason"
+          :rows="2"
+          class="w-full"
+          data-testid="automation-reason"
+        />
+      </UFormField>
+      <div class="grid grid-cols-2 gap-4">
+        <UFormField label="Checked at" description="ISO date, e.g. 2026-10-09.">
+          <UInput v-model="model.automationCheckedAt" class="w-full" />
+        </UFormField>
+        <UFormField
+          label="Checked by"
+          description="Method or person, e.g. code path review of a file."
+        >
+          <UInput v-model="model.automationCheckedBy" class="w-full" />
+        </UFormField>
+      </div>
     </div>
 
     <UFormField

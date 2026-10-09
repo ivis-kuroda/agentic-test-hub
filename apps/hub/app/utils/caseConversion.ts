@@ -28,6 +28,9 @@ export function emptyCaseDraft(): CaseDraft {
     appliesToRelease: "",
     automationStatus: "manual",
     automationImpl: "",
+    automationReason: "",
+    automationCheckedAt: "",
+    automationCheckedBy: "",
     viewpoints: [],
     note: "",
   };
@@ -63,6 +66,9 @@ export function caseDraftFromEntity(entity: TestCase): CaseDraft {
     appliesToRelease: entity.appliesTo?.release ?? "",
     automationStatus: entity.automation.status,
     automationImpl: entity.automation.impl ?? "",
+    automationReason: entity.automation.reason ?? "",
+    automationCheckedAt: entity.automation.checkedAt ?? "",
+    automationCheckedBy: entity.automation.checkedBy ?? "",
     viewpoints: [...entity.viewpoints],
     note: entity.note ?? "",
   };
@@ -120,6 +126,9 @@ export function caseDraftToEntity(draft: CaseDraft): unknown {
     automation: {
       status: draft.automationStatus,
       ...(draft.automationImpl === "" ? {} : { impl: draft.automationImpl }),
+      ...(draft.automationReason === "" ? {} : { reason: draft.automationReason }),
+      ...(draft.automationCheckedAt === "" ? {} : { checkedAt: draft.automationCheckedAt }),
+      ...(draft.automationCheckedBy === "" ? {} : { checkedBy: draft.automationCheckedBy }),
     },
     viewpoints: draft.viewpoints,
     ...(draft.note === "" ? {} : { note: draft.note }),
