@@ -218,6 +218,16 @@ function planCase(
   const testCase = suite.cases.find((candidate) => candidate.id === id);
   if (!testCase) return refuse(`no case ${id} in this suite`);
 
+  // Never overridable, not even with --force: generating would write the
+  // status back as `generated` and erase the recorded finding.
+  if (testCase.automation.status === "not_runnable") {
+    return refuse(
+      `case ${id} is marked not_runnable (${testCase.automation.reason ?? "no reason recorded"}); ` +
+        "it cannot be run without changes this hub does not make, so no test is generated and the spec is left untouched. " +
+        "Change automation.status in the spec first if that is no longer true",
+    );
+  }
+
   const baseline = suite.baselines.find((candidate) => candidate.id === testCase.baseline);
   if (!baseline) {
     return refuse(`case ${id} names baseline ${testCase.baseline}, which this suite does not have`);

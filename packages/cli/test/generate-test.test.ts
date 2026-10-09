@@ -155,6 +155,48 @@ async function setupSpecs(): Promise<{ specsDir: string; pluginPath: string; plu
 }
 
 describe("main (ath-generate-test)", () => {
+  it("refuses a not_runnable case, even with --force, and writes nothing back", async () => {
+    const { specsDir, pluginPath, pluginRoot } = await setupSpecs();
+    const store = new SpecStore(specsDir);
+    const { suite, files } = await store.load();
+    const original = suite.cases.find((c) => c.id === "TC-DISPATCH-002")!;
+    await store.save({
+      kind: "case",
+      expectedHash: files.get("case/TC-DISPATCH-002")!.hash,
+      entity: {
+        ...original,
+        automation: { status: "not_runnable", reason: "needs a source change to the target" },
+      },
+    });
+    const outDir = join(pluginRoot, "generated");
+
+    for (const extra of [[], ["--force"]]) {
+      const { io, stderr } = fakeIo();
+      const code = await main(
+        [
+          "TC-DISPATCH-002",
+          "--specs",
+          specsDir,
+          "--plugin",
+          pluginPath,
+          "--plugin-root",
+          pluginRoot,
+          ...extra,
+        ],
+        io,
+      );
+      expect(code).toBe(1);
+      expect(stderr.join("")).toContain("not_runnable");
+      expect(stderr.join("")).toContain("needs a source change to the target");
+    }
+
+    await expect(stat(outDir)).rejects.toThrow();
+    const after = (await new SpecStore(specsDir).load()).suite.cases.find(
+      (c) => c.id === "TC-DISPATCH-002",
+    );
+    expect(after?.automation.status).toBe("not_runnable");
+  });
+
   it("generates a TypeScript test and writes automation.status back to the case YAML", async () => {
     const { specsDir, pluginPath, pluginRoot } = await setupSpecs();
     const { io, stderr } = fakeIo();
