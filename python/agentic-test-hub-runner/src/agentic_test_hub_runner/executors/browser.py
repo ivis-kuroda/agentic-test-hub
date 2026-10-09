@@ -58,6 +58,18 @@ class BrowserDriver(Protocol):
 
 PREVIEW_LIMIT = 16 * 1024
 
+SETTLE_TIMEOUT_MS = 5_000
+"""Upper bound on how long a session waits for in-flight requests to finish
+before its logs are read or it is closed. A page's own UI can report success
+(a rendered status, say) before Playwright has delivered that request's
+`response` event, and a click returns before the request it triggers has been
+reported, so reading the logs straight away can miss an exchange that really
+happened. Waiting is bounded so a request that never completes (a long poll,
+a stalled server) cannot hang a run; whatever is still pending then is simply
+not in the log."""
+
+_SETTLE_POLL_MS = 10
+
 
 @dataclass
 class _PlaywrightSession:
@@ -70,11 +82,35 @@ class _PlaywrightSession:
     _console: list[ConsoleMessage] = field(default_factory=list)
     _network: list[NetworkExchange] = field(default_factory=list)
     _closed: bool = False
+    _pending: set[Any] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         self.page.on("console", self._on_console)
+        self.page.on("request", self._on_request)
         self.page.on("response", self._on_response)
+        self.page.on("requestfinished", self._on_request_done)
         self.page.on("requestfailed", self._on_request_failed)
+
+    def _on_request(self, request: Any) -> None:
+        self._pending.add(request)
+
+    def _on_request_done(self, request: Any) -> None:
+        self._pending.discard(request)
+
+    def settle(self, timeout_ms: int = SETTLE_TIMEOUT_MS) -> None:
+        """Waits, up to `timeout_ms`, until every request the page started has
+        finished or failed and its event handlers have run, so the console and
+        network logs are complete. Never raises (a closed page has nothing left
+        to wait for)."""
+        try:
+            # A round trip first: events the browser emitted before this call
+            # (a request started by the click that just returned) get delivered.
+            self.page.evaluate("0")
+            deadline = time.monotonic() + timeout_ms / 1000
+            while self._pending and time.monotonic() < deadline:
+                self.page.wait_for_timeout(_SETTLE_POLL_MS)
+        except Exception:
+            return
 
     def _on_console(self, message: Any) -> None:
         type_ = message.type
@@ -113,6 +149,7 @@ class _PlaywrightSession:
         )
 
     def _on_request_failed(self, request: Any) -> None:
+        self._pending.discard(request)
         self._network.append(
             NetworkExchange(method=request.method, url=request.url, status=0, failed=True)
         )
@@ -146,14 +183,19 @@ class _PlaywrightSession:
         return self.page.url
 
     def console_messages(self) -> list[ConsoleMessage]:
+        if not self._closed:
+            self.settle()
         return self._console
 
     def network_exchanges(self) -> list[NetworkExchange]:
+        if not self._closed:
+            self.settle()
         return self._network
 
     def close(self) -> None:
         if self._closed:
             return
+        self.settle()
         self._closed = True
         self.context.close()
         self.browser.close()
