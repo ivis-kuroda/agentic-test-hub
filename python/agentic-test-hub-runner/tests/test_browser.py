@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import cast
 
-from agentic_test_hub_runner.executors.browser import PlaywrightDriver, _PlaywrightSession
+from agentic_test_hub_runner.executors.browser import (
+    PlaywrightDriver,
+    PlaywrightOptions,
+    _PlaywrightSession,
+)
 
 
 def _fake_page():
@@ -81,3 +85,53 @@ def test_open_wires_the_started_playwright_into_the_session(monkeypatch):
     assert session.playwright is fake_playwright
     session.close()
     assert stopped == [True]
+
+
+def _open_capturing_context_kwargs(monkeypatch, options=None) -> dict:
+    captured: dict = {}
+
+    def new_context(self, **kwargs):
+        captured.update(kwargs)
+        return type(
+            "Context", (), {"close": lambda self: None, "new_page": lambda self: _fake_page()}
+        )()
+
+    browser = type("Browser", (), {"close": lambda self: None, "new_context": new_context})()
+    chromium = type("Chromium", (), {"launch": lambda self, **k: browser})()
+    fake_playwright = type("PW", (), {"stop": lambda self: None, "chromium": chromium})()
+
+    class FakeContextManager:
+        def start(self):
+            return fake_playwright
+
+    import playwright.sync_api as sync_api_module
+
+    monkeypatch.setattr(sync_api_module, "sync_playwright", lambda: FakeContextManager())
+    PlaywrightDriver(options).open("http://example.test").close()
+    return captured
+
+
+def test_ignore_https_errors_defaults_to_false(monkeypatch):
+    monkeypatch.delenv("ATH_BROWSER_IGNORE_HTTPS_ERRORS", raising=False)
+    assert _open_capturing_context_kwargs(monkeypatch)["ignore_https_errors"] is False
+
+
+def test_ignore_https_errors_option_is_passed_to_the_context(monkeypatch):
+    monkeypatch.delenv("ATH_BROWSER_IGNORE_HTTPS_ERRORS", raising=False)
+    kwargs = _open_capturing_context_kwargs(
+        monkeypatch, PlaywrightOptions(ignore_https_errors=True)
+    )
+    assert kwargs["ignore_https_errors"] is True
+
+
+def test_ignore_https_errors_env_applies_when_no_explicit_option(monkeypatch):
+    monkeypatch.setenv("ATH_BROWSER_IGNORE_HTTPS_ERRORS", "1")
+    assert _open_capturing_context_kwargs(monkeypatch)["ignore_https_errors"] is True
+
+
+def test_explicit_option_wins_over_the_environment(monkeypatch):
+    monkeypatch.setenv("ATH_BROWSER_IGNORE_HTTPS_ERRORS", "1")
+    kwargs = _open_capturing_context_kwargs(
+        monkeypatch, PlaywrightOptions(ignore_https_errors=False)
+    )
+    assert kwargs["ignore_https_errors"] is False

@@ -9,6 +9,7 @@ Python test ever uses.
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
@@ -171,6 +172,24 @@ class PlaywrightOptions:
     executable_path: str | None = None
     storage_state: str | None = None
     default_timeout_ms: int = 10_000
+    ignore_https_errors: bool | None = None
+    """Accept invalid TLS certificates (self-signed, expired, wrong host).
+
+    `None` (the default) means "not chosen": the environment variable
+    `ATH_BROWSER_IGNORE_HTTPS_ERRORS` decides (`1`/`true`/`yes`/`on` enables),
+    and without it certificates are verified. An explicit `True` or `False`
+    always wins over the environment. Enable it only for targets that
+    legitimately run with a throwaway certificate.
+    """
+
+
+IGNORE_HTTPS_ERRORS_ENV = "ATH_BROWSER_IGNORE_HTTPS_ERRORS"
+
+
+def _resolve_ignore_https_errors(option: bool | None) -> bool:
+    if option is not None:
+        return option
+    return os.environ.get(IGNORE_HTTPS_ERRORS_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 class PlaywrightDriver:
@@ -188,7 +207,10 @@ class PlaywrightDriver:
             launch_kwargs["executable_path"] = self._options.executable_path
         browser = playwright.chromium.launch(**launch_kwargs)
 
-        context_kwargs: dict[str, Any] = {"base_url": base_url}
+        context_kwargs: dict[str, Any] = {
+            "base_url": base_url,
+            "ignore_https_errors": _resolve_ignore_https_errors(self._options.ignore_https_errors),
+        }
         if self._options.storage_state is not None:
             context_kwargs["storage_state"] = self._options.storage_state
         context = browser.new_context(**context_kwargs)
