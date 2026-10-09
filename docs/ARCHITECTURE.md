@@ -129,6 +129,29 @@ The delivery view re-creates presentational abbreviations such as "same as
 above" at render time by collapsing repeated values. Those abbreviations are a
 rendering concern; they never enter the source.
 
+## A case that cannot be run
+
+`automation.status` is one of `manual`, `generated`, `verified`, `not_runnable`.
+`not_runnable` records a finding: the case cannot be run without modifying the
+target's own source (or for another stated reason). Its fields, all on the
+case's `automation` block:
+
+| Field       | Meaning                                                                          |
+|-------------|----------------------------------------------------------------------------------|
+| `reason`    | Why it cannot be run. Required for `not_runnable` (`validateSuite` / `pnpm specs:validate` errors without it) |
+| `checkedAt` | ISO 8601 date (or date-time) the runnability was last checked                    |
+| `checkedBy` | Free text: method or person, e.g. `code path review of <file>`                   |
+
+Consequences: `ath-generate-test` refuses the case (exit 1, with the reason),
+even with `--force`, and writes nothing back, so the status is never
+overwritten with `generated`. Views show it apart from `manual`: the reviewer
+HTML has a "Not runnable (実施不可)" section and flags affected viewpoints, and
+delivery rows carry `automation` so `describeAutomation(row)` renders
+`実施不可 / not runnable: <reason>`. The hub editor shows the status and edits
+the reason and check fields. Scenarios carry no `automation` block, so they
+have no equivalent status; a scenario step that cannot be run is expressed by
+leaving the scenario out of generation.
+
 ## Evidence, and what a pass is allowed to rest on
 
 A screenshot shows what a page rendered. It cannot show that the service

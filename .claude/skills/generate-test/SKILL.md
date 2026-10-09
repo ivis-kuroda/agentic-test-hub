@@ -35,7 +35,9 @@ Establish, by asking if the request does not say:
      [--python-extensions-module <path/to/extensions.py>] --out <out-file>
    ```
    Exit 1 = refused or already generated (rerun with `--force` only when a
-   regeneration is intended); exit 2 = usage error.
+   regeneration is intended); exit 2 = usage error. A case marked
+   `automation.status: not_runnable` is always refused, even with `--force`:
+   do not generate for it or edit the status to get around the refusal.
 3. **Read the generated file.** Check imports resolve (missing imports have
    happened), the extensions module path is right, and the module name is
    importable. Hyphenated module names cannot be imported: name the file with
