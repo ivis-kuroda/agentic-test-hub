@@ -45,12 +45,19 @@ export function renderViewpointsSection(suite: Suite): string {
       const coverageLine = entry.uncovered
         ? '<p class="coverage-line"><span class="badge uncovered">uncovered</span> nothing verifies this viewpoint</p>'
         : `<p class="coverage-line"><span class="n">${references.length}</span> reference(s): ${references.join(", ")}</p>`;
+      const notRunnableLine =
+        entry.notRunnableCases.length === 0
+          ? ""
+          : `<p class="coverage-line"><span class="badge not-runnable">not runnable 実施不可</span> ${entry.notRunnableCases
+              .map((id) => `<code>${escapeHtml(id)}</code>`)
+              .join(", ")} cannot be run, so nothing confirms them</p>`;
 
       return `<article class="viewpoint risk-${viewpoint.risk}${entry.uncovered ? " uncovered" : ""}">
   <h3>${escapeHtml(viewpoint.title)} <span class="badge risk-${viewpoint.risk}">${viewpoint.risk}</span></h3>
   <p class="rationale">${escapeHtml(viewpoint.rationale)}</p>
   ${sourceList(viewpoint.source)}
   ${coverageLine}
+  ${notRunnableLine}
 </article>`;
     })
     .join("\n");

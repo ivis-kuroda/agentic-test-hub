@@ -1,6 +1,7 @@
 import {
   applyOverrides,
   type ActionRef,
+  type AutomationStatus,
   type Baseline,
   type Expectation,
   type Suite,
@@ -25,6 +26,36 @@ export interface DeliveryRow {
   readonly procedure: string;
   /** What must hold afterward. */
   readonly expected: readonly string[];
+  /**
+   * Automation state of the case this row comes from; absent for scenario
+   * steps, which carry no automation status.
+   */
+  readonly automation?: {
+    readonly status: AutomationStatus;
+    /** Why the case cannot be run; set for `not_runnable`. */
+    readonly reason?: string;
+  };
+}
+
+/** Label shown in a delivery sheet's result column for a case nobody can run. */
+export const NOT_RUNNABLE_LABEL = "実施不可";
+
+/**
+ * Renders a row's automation state for a delivery column.
+ *
+ * `not_runnable` reads `実施不可 / not runnable: <reason>`, never like
+ * `manual`, because a manual case will be run by a person and this one will
+ * not be run at all. Other statuses render as their name; a row without
+ * automation (a scenario step) renders empty.
+ *
+ * @param row - The delivery row.
+ * @returns Text for one cell.
+ */
+export function describeAutomation(row: DeliveryRow): string {
+  if (row.automation === undefined) return "";
+  if (row.automation.status !== "not_runnable") return row.automation.status;
+  const reason = row.automation.reason === undefined ? "" : `: ${row.automation.reason}`;
+  return `${NOT_RUNNABLE_LABEL} / not runnable${reason}`;
 }
 
 function describeAction(action: ActionRef | undefined): string {
@@ -81,6 +112,10 @@ export function rowForCase(testCase: TestCase, baseline: Baseline): DeliveryRow 
     preconditions: resolved.preconditions,
     procedure: describeAction(resolved.action),
     expected: testCase.expect.map(describeExpectation),
+    automation: {
+      status: testCase.automation.status,
+      ...(testCase.automation.reason === undefined ? {} : { reason: testCase.automation.reason }),
+    },
   };
 }
 

@@ -2,6 +2,7 @@ import { validateSuite, type Suite } from "@agentic-test-hub/core";
 
 import { escapeHtml } from "./escape.ts";
 import { renderMatricesSection } from "./matrices-section.ts";
+import { renderNotRunnableSection } from "./not-runnable-section.ts";
 import { STYLES } from "./styles.ts";
 import { renderViewpointsSection } from "./viewpoints-section.ts";
 
@@ -74,6 +75,7 @@ ${subtitle}
 ${renderProblems(suite)}
 ${renderViewpointsSection(suite)}
 ${renderMatricesSection(suite)}
+${renderNotRunnableSection(suite)}
 <footer>Generated ${escapeHtml(generatedAt.toISOString())}. Regenerated from source on every change; not itself a source of truth.</footer>
 </body>
 </html>

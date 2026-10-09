@@ -126,3 +126,33 @@ describe("renderReviewerView", () => {
     expect(html).toContain("2026-01-01T00:00:00.000Z");
   });
 });
+
+describe("renderReviewerView with a not_runnable case", () => {
+  it("lists it apart from the viewpoints, with its reason and check details", () => {
+    const suite = {
+      ...soundSuite,
+      cases: soundSuite.cases.map((testCase, index) =>
+        index === 0
+          ? {
+              ...testCase,
+              automation: {
+                status: "not_runnable" as const,
+                reason: "needs a source change to the target",
+                checkedAt: "2026-10-09",
+                checkedBy: "code path review",
+              },
+            }
+          : testCase,
+      ),
+    };
+    const html = renderReviewerView(suite, { title: "t" });
+    expect(html).toContain('id="not-runnable"');
+    expect(html).toContain("実施不可");
+    expect(html).toContain("needs a source change to the target");
+    expect(html).toContain("2026-10-09 — code path review");
+  });
+
+  it("omits the section when every case can be run", () => {
+    expect(renderReviewerView(soundSuite, { title: "t" })).not.toContain('id="not-runnable"');
+  });
+});

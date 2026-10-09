@@ -4,6 +4,7 @@ import { EMPTY_SUITE, type Suite } from "@agentic-test-hub/core";
 
 import { baseline, caseBaselineEmail, caseSms } from "../../core/test/fixtures.ts";
 import { renderDeliveryWorkbook, type DeliveryColumn } from "../src/delivery-excel.ts";
+import { describeAutomation } from "../src/execution-rows.ts";
 
 const columns: readonly DeliveryColumn[] = [
   { header: "No", width: 6, value: (_row, index) => index + 1 },
@@ -82,5 +83,24 @@ describe("renderDeliveryWorkbook", () => {
     const workbook = renderDeliveryWorkbook(EMPTY_SUITE, { sheetName: "Cases", columns });
     const sheet = workbook.getWorksheet("Cases")!;
     expect(sheet.rowCount).toBe(1);
+  });
+});
+
+describe("renderDeliveryWorkbook with a not_runnable case", () => {
+  it("shows 実施不可 and the reason through describeAutomation", () => {
+    const notRunnableSuite: Suite = {
+      ...suite,
+      cases: [
+        caseBaselineEmail,
+        { ...caseSms, automation: { status: "not_runnable", reason: "needs a source change" } },
+      ],
+    };
+    const workbook = renderDeliveryWorkbook(notRunnableSuite, {
+      sheetName: "Cases",
+      columns: [{ header: "Automation", value: (row) => describeAutomation(row) }],
+    });
+    const sheet = workbook.getWorksheet("Cases")!;
+    expect(sheet.getRow(2).getCell(1).value).toBe("manual");
+    expect(sheet.getRow(3).getCell(1).value).toBe("実施不可 / not runnable: needs a source change");
   });
 });

@@ -11,7 +11,12 @@
  */
 import { writeFile } from "node:fs/promises";
 
-import { renderDeliveryWorkbook, type DeliveryColumn } from "@agentic-test-hub/export";
+import {
+  NOT_RUNNABLE_LABEL,
+  describeAutomation,
+  renderDeliveryWorkbook,
+  type DeliveryColumn,
+} from "@agentic-test-hub/export";
 import { loadSuite } from "@agentic-test-hub/store";
 
 const [root, out] = process.argv.slice(2);
@@ -28,7 +33,12 @@ const columns: readonly DeliveryColumn[] = [
   { header: "Preconditions", width: 30, value: (row) => row.preconditions.join("\n") },
   { header: "Procedure", width: 30, value: (row) => row.procedure },
   { header: "Expected result", width: 40, value: (row) => row.expected.join("\n") },
-  { header: "Result", width: 10, value: () => "" },
+  { header: "Automation", width: 24, value: (row) => describeAutomation(row) },
+  {
+    header: "Result",
+    width: 10,
+    value: (row) => (row.automation?.status === "not_runnable" ? NOT_RUNNABLE_LABEL : ""),
+  },
   { header: "Bug ref", width: 12, value: () => "" },
 ];
 

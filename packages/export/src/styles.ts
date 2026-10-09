@@ -92,6 +92,7 @@ h3 { font-size: 1rem; margin: 0 0 .3rem; }
 .badge.risk-medium { color: var(--risk-medium); background: var(--surface); }
 .badge.risk-low { color: var(--risk-low); background: var(--covered-bg); }
 .badge.uncovered { color: var(--gap); background: var(--gap-bg); }
+.badge.not-runnable { color: var(--gap); background: var(--gap-bg); text-transform: none; }
 .viewpoint .rationale { margin: .4rem 0; }
 .source-list, .ref-list { list-style: none; padding: 0; margin: .4rem 0 0; font-size: .85rem; color: var(--muted); }
 .source-list li, .ref-list li { padding: .1rem 0; }

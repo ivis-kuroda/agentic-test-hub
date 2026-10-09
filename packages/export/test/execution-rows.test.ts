@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_SUITE, Scenario, type Suite } from "@agentic-test-hub/core";
 
 import { baseline, caseBaselineEmail, caseNoAuth, caseSms } from "../../core/test/fixtures.ts";
-import { buildDeliveryRows, rowForCase } from "../src/execution-rows.ts";
+import { buildDeliveryRows, describeAutomation, rowForCase } from "../src/execution-rows.ts";
 
 describe("rowForCase", () => {
   it("resolves the target from the baseline when the case does not override it", () => {
@@ -139,5 +139,26 @@ describe("buildDeliveryRows", () => {
     expect("caseId" in rows[0]!.source).toBe(true);
     expect("caseId" in rows[1]!.source).toBe(true);
     expect("stepId" in rows[2]!.source).toBe(true);
+  });
+});
+
+describe("not_runnable rows", () => {
+  const notRunnable = {
+    ...caseNoAuth,
+    automation: { status: "not_runnable" as const, reason: "needs a source change" },
+  };
+
+  it("carries the automation status and reason on the row", () => {
+    expect(rowForCase(notRunnable, baseline).automation).toEqual({
+      status: "not_runnable",
+      reason: "needs a source change",
+    });
+  });
+
+  it("describes not_runnable distinctly from manual, with the reason", () => {
+    expect(describeAutomation(rowForCase(notRunnable, baseline))).toBe(
+      "実施不可 / not runnable: needs a source change",
+    );
+    expect(describeAutomation(rowForCase(caseNoAuth, baseline))).toBe("manual");
   });
 });
