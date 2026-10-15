@@ -224,14 +224,43 @@ class PlaywrightOptions:
     legitimately run with a throwaway certificate.
     """
 
+    block_urls: tuple[str, ...] | None = None
+    """URL glob patterns whose requests are aborted before they leave the browser.
+
+    For targets that reference resources the test network cannot reach (e.g.
+    a CDN behind no internet access): the page would otherwise stall until the
+    request times out. `None` means "not chosen": the environment variable
+    `ATH_BROWSER_BLOCK_URLS` (comma-separated globs) decides, and without it
+    nothing is blocked. Blocking changes what the page loads, so a run that
+    uses it should say so in its evidence.
+    """
+
 
 IGNORE_HTTPS_ERRORS_ENV = "ATH_BROWSER_IGNORE_HTTPS_ERRORS"
+BLOCK_URLS_ENV = "ATH_BROWSER_BLOCK_URLS"
+DEFAULT_TIMEOUT_ENV = "ATH_BROWSER_DEFAULT_TIMEOUT_MS"
 
 
 def _resolve_ignore_https_errors(option: bool | None) -> bool:
     if option is not None:
         return option
     return os.environ.get(IGNORE_HTTPS_ERRORS_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def resolve_block_urls(option: tuple[str, ...] | None) -> tuple[str, ...]:
+    """Return the URL globs to abort: the explicit option, else `ATH_BROWSER_BLOCK_URLS`."""
+    if option is not None:
+        return option
+    raw = os.environ.get(BLOCK_URLS_ENV, "")
+    return tuple(p.strip() for p in raw.split(",") if p.strip())
+
+
+def resolve_default_timeout_ms(option: int) -> int:
+    """Return `ATH_BROWSER_DEFAULT_TIMEOUT_MS` when it is a positive int, else `option`."""
+    raw = os.environ.get(DEFAULT_TIMEOUT_ENV, "").strip()
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    return option
 
 
 class PlaywrightDriver:
@@ -256,8 +285,10 @@ class PlaywrightDriver:
         if self._options.storage_state is not None:
             context_kwargs["storage_state"] = self._options.storage_state
         context = browser.new_context(**context_kwargs)
+        for pattern in resolve_block_urls(self._options.block_urls):
+            context.route(pattern, lambda route: route.abort())
         page = context.new_page()
-        page.set_default_timeout(self._options.default_timeout_ms)
+        page.set_default_timeout(resolve_default_timeout_ms(self._options.default_timeout_ms))
         return _PlaywrightSession(
             playwright=playwright, browser=browser, context=context, page=page
         )
