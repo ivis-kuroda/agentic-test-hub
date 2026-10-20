@@ -72,12 +72,49 @@ the thing is for, what the caller is responsible for, and anything surprising.
   - `docs/ja/SETUP.md` — how to run this locally: install, start the web
     editor, generate the reviewer view and delivery workbook, run the tests.
 
-## Skills
+## Agents, skills and templates
 
-`.claude/skills/`: `generate-spec` (draft specs from design docs/code),
-`generate-test` (reviewed specs to committed test code), `triage-run-result`
-(classify non-passes, record results), `write-handoff` (continue on another
-machine).
+Everything in `.claude/` and `templates/` is generic: it names no target and
+refers to the system under test as "the SUT". Target-specific variants live in
+the plugin or the project's knowledge repository and assume these.
+
+`.claude/agents/` (run a test campaign; the orchestrator runs as the main
+session, `claude --agent test-orchestrator`):
+
+| Agent | Role |
+|---|---|
+| `test-orchestrator` | Plans, delegates, verifies, records, hands off; never drives the SUT or writes test code |
+| `ui-explorer` | agent-browser exploration: UNVERIFIED → VERIFIED selectors, measured timings; returns corrections, edits no docs |
+| `ui-procedure-author` | Deterministic Playwright procedures from VERIFIED selectors, with tests |
+| `scenario-runner` | Implements and runs one block of spec steps as the only SUT client; fixed report contract |
+| `evidence-reviewer` | Read-only review of saved evidence per step |
+
+`.claude/skills/`:
+
+| Skill | Use for |
+|---|---|
+| `generate-spec` | Draft specs from design docs/code |
+| `generate-test` | Reviewed specs to committed test code |
+| `triage-run-result` | Classify non-passes, record results |
+| `write-handoff` | HANDOFF and resume prompt (another machine, or a campaign block boundary) |
+| `test-kickoff` | Owner question batches → numbered decision log; baseline via merge-base; provenance check |
+| `spec-reconcile` | Viewpoints ↔ cases mapping, version check, orphans |
+| `delegation-brief` | Template for every brief to an agent |
+| `verify-claims` | Checklist before recording a hand-back |
+| `web-ui-explore` | agent-browser method, UI friction catalogue, VERIFIED marking |
+| `playwright-procedure` | Helper set and conventions for screen procedures; migration to G1/G2/G5 |
+| `timing-window-test` | Steps that must act inside a short server-side window |
+| `env-change-guard` | Backup → apply → verify → restore in finally → verify → log |
+| `status-report` | Computed status table with unblock paths |
+
+`templates/project-knowledge/`: skeleton of a project's knowledge repository
+(decision log, selector registry, HANDOFF, test plan, findings, env-change
+log, status summary); see its `README.md`.
+
+Some reusable code (per-step evidence recorder, verdict set, restore guard,
+credential broker, screen helpers) is still written inside plugins. A plugin
+may carry its own implementation until the matching gap in
+`docs/EXPRESSIVENESS-GAPS.md` (G1–G7) lands in the hub.
 
 ## Working agreement
 
