@@ -1,6 +1,6 @@
 ---
 name: write-handoff
-description: Hand in-progress work to a fresh Claude Code session on another machine by writing HANDOFF.md, committing it to a dedicated tmp/handoff-<topic> branch, pushing it, and giving the human a starting prompt. Use when asked to hand off, continue elsewhere, or when work needs an environment (live target, credentials, network) this session lacks.
+description: Hand in-progress work to a fresh Claude Code session by writing HANDOFF.md and a resume prompt that puts open questions first. Two forms - hub work on another machine (tmp/handoff-<topic> branch, pushed), and a test campaign's project-knowledge HANDOFF refreshed at every block boundary or at about 60 % context. Use when asked to hand off or continue elsewhere, when work needs an environment this session lacks, or when a test block ends. Not for status reports to the owner (status-report).
 ---
 
 # Writing a handoff
@@ -22,6 +22,8 @@ verify.
      **UNVERIFIED** (written but never run, assumed, or untestable here).
    - **Branch/commit map:** branch -> SHA -> what it holds, which branch is the
      base, which are spec-draft branches awaiting review.
+   - **Open questions** for the owner, first in the reading order of the
+     next session (see "Resume prompt").
    - **Exact commands** to set up and to run (copy-pasteable), including paths
      and flags.
    - **Environment variables** by name and meaning (e.g. `ATH_EVIDENCE_DIR`);
@@ -42,17 +44,53 @@ verify.
    and are deleted once the work lands.
 5. Check the file for secrets, hostnames or application names that must not be
    in the hub (`pnpm check` if it lives in the hub).
-6. Give the human one paragraph to start the new session, for example: "Clone
+6. Give the human the resume prompt (see below), for example: "Clone
    <repo>, check out `tmp/handoff-<topic>`, read `HANDOFF.md` and `AGENTS.md`,
-   follow the first-run checklist, and report before making any open
-   decision."
+   ask me the open questions, then follow the first-run checklist."
+
+## Test-campaign form (project-knowledge HANDOFF)
+
+In a test campaign the handoff lives in the project's knowledge repository
+(`docs/testing/<spec>/HANDOFF.md`, skeleton in
+`templates/project-knowledge/`), on the campaign branch, and is **refreshed,
+not re-created**:
+
+- at every block boundary, after the hand-back was verified
+  (`verify-claims`) and recorded;
+- whenever the orchestrator's context passes about 60 %;
+- before any heavy or destructive step that might kill the session.
+
+Sections: goal and where we are (counts computed from the results file),
+repositories/branches/commits, how to run, current SUT state (prepared
+objects, deliberately open sessions, changes kept on purpose, backups),
+remaining work, recent owner decisions (by number), open questions, working
+pattern that worked. Each claim verified or UNVERIFIED as above. No push
+unless the decision log allows it.
+
+## Resume prompt
+
+Always end with a prompt the human pastes into the new session. It fixes the
+reading order and makes the open questions come first, so the new session
+does not act on an undecided point:
+
+```
+You are resuming <campaign/topic>. Read, in this order:
+1. <path>/HANDOFF.md
+2. <path>/AGENTS.md (binding decisions 1–N)
+3. <path>/findings.md and <path>/env-changes/README.md
+Before doing anything else, ask me the "Open questions" in HANDOFF §<n>
+(AskUserQuestion, with impact and your recommendation). Then continue with
+"Remaining work" item 1. Working rules: <one SUT writer at a time; delegate
+blocks; verify claims; language rules>.
+```
 
 ## Sufficiency checklist
 
 - A stranger could run the first command without asking anything.
 - Every claim is tagged verified or UNVERIFIED.
 - Every branch you mention exists on origin at the stated SHA.
-- Open decisions are listed, not silently made.
+- Open decisions are listed, not silently made, and the resume prompt asks
+  them first.
 - No secrets, no uncommitted state, no reliance on this session's files.
 
 ## Report to the human
